@@ -1,0 +1,120 @@
+// Stokko — Prisma schema
+// Architecture: Multi-tenant SaaS, organizationId on every owned entity.
+// See plan: /Users/pavleandric/.claude/plans/u-ovom-folderu-cemo-humming-toucan.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── ENUMS ─────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  EMPLOYEE
+}
+
+enum AuditAction {
+  // Inventory entities (introduced in later phases — listed now so the
+  // enum doesn't need a migration each time).
+  ARTICLE_CREATED
+  ARTICLE_UPDATED
+  ARTICLE_DELETED
+  CATEGORY_CREATED
+  CATEGORY_UPDATED
+  CATEGORY_DELETED
+  WAREHOUSE_CREATED
+  WAREHOUSE_UPDATED
+  WAREHOUSE_DELETED
+  SUPPLIER_CREATED
+  SUPPLIER_UPDATED
+  SUPPLIER_DELETED
+  PROCUREMENT_CREATED
+  CORRECTION_CREATED
+
+  // User / org actions (active in Phase 1)
+  USER_INVITED
+  USER_ROLE_CHANGED
+  USER_DEACTIVATED
+  USER_REACTIVATED
+  USER_PASSWORD_RESET
+  USER_PASSWORD_CHANGED
+  USER_LOGGED_IN
+}
+
+// ───────────── CORE ─────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  currency  String   @default("EUR") // ISO 4217
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  email              String
+  passwordHash       String
+  role               Role
+  firstName          String
+  lastName           String
+  mustChangePassword Boolean  @default(true)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+
+  @@unique([organizationId, email])
+  @@index([email])
+}
+
+model RefreshToken {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  tokenHash      String   @unique
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ───────────── AUDIT ─────────────
+
+model AuditLog {
+  id             String      @id @default(cuid())
+  organizationId String
+  userId         String
+  action         AuditAction
+  entityType     String
+  entityId       String
+  before         Json?
+  after          Json?
+  createdAt      DateTime    @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+}
