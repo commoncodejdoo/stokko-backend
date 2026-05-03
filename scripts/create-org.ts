@@ -15,6 +15,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/data/common/prisma/prisma.service';
+import { CategoriesService } from '../src/domain/categories/categories.service';
 import { Role } from '../src/domain/common/role';
 import { OrganizationsService } from '../src/domain/organizations/organizations.service';
 import { UsersService } from '../src/domain/users/users.service';
@@ -69,6 +70,7 @@ async function main(): Promise<void> {
     const prisma = app.get(PrismaService);
     const orgs = app.get(OrganizationsService);
     const users = app.get(UsersService);
+    const categories = app.get(CategoriesService);
 
     const result = await prisma.$transaction(async (tx) => {
       const org = await orgs.create({ name: orgName, currency }, tx);
@@ -83,7 +85,8 @@ async function main(): Promise<void> {
         null,
         tx,
       );
-      return { org, ...invite };
+      const seeded = await categories.seedPredefined(org.id, invite.user.id, tx);
+      return { org, ...invite, seededCategories: seeded.length };
     });
 
     console.log('');
@@ -97,6 +100,8 @@ async function main(): Promise<void> {
     console.log(` Owner:        ${result.user.fullName()}`);
     console.log(`        email: ${result.user.email}`);
     console.log(`           id: ${result.user.id}`);
+    console.log('');
+    console.log(` Categories seeded: ${result.seededCategories}`);
     console.log('');
     console.log(` Temporary password (give to Owner):`);
     console.log(`     ${result.temporaryPassword}`);

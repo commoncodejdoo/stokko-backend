@@ -7,4 +7,8 @@ export declare abstract class AuditLogRepository {
         items: AuditLogEntry[];
         total: number;
     }>;
+    abstract findArticleHistory(organizationId: string, articleId: string, page: number, pageSize: number, tx?: TxClient): Promise<{
+        items: AuditLogEntry[];
+        total: number;
+    }>;
 }

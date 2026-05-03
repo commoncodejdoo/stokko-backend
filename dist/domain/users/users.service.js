@@ -40,6 +40,9 @@ let UsersService = class UsersService {
     async findAllByEmail(email, tx) {
         return this.repo.findAllByEmail(email, tx);
     }
+    async listByOrg(organizationId, tx) {
+        return this.repo.listByOrg(organizationId, tx);
+    }
     async invite(input, actorUserId, tx) {
         const temporaryPassword = this.hasher.generateTemporary();
         const passwordHash = await this.hasher.hash(temporaryPassword);

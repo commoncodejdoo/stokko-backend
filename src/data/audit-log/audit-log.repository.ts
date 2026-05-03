@@ -72,4 +72,39 @@ export class PrismaAuditLogRepository extends AuditLogRepository {
       total,
     };
   }
+
+  async findArticleHistory(
+    organizationId: string,
+    articleId: string,
+    page: number,
+    pageSize: number,
+    tx?: TxClient,
+  ): Promise<{ items: AuditLogEntry[]; total: number }> {
+    const where: Prisma.AuditLogWhereInput = {
+      organizationId,
+      OR: [
+        { entityType: 'Article', entityId: articleId },
+        {
+          entityType: 'StockCorrection',
+          after: { path: ['articleId'], equals: articleId },
+        },
+      ],
+    };
+    const client = this.client(tx);
+
+    const [rows, total] = await Promise.all([
+      client.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      client.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((r) => this.mapper.toDomain(r)),
+      total,
+    };
+  }
 }

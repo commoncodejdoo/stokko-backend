@@ -10,4 +10,8 @@ export declare class AuditLogService {
         items: AuditLogEntry[];
         total: number;
     }>;
+    listArticleHistory(organizationId: string, articleId: string, page?: number, pageSize?: number): Promise<{
+        items: AuditLogEntry[];
+        total: number;
+    }>;
 }

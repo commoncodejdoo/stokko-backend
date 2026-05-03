@@ -63,6 +63,32 @@ let PrismaAuditLogRepository = class PrismaAuditLogRepository extends audit_log_
             total,
         };
     }
+    async findArticleHistory(organizationId, articleId, page, pageSize, tx) {
+        const where = {
+            organizationId,
+            OR: [
+                { entityType: 'Article', entityId: articleId },
+                {
+                    entityType: 'StockCorrection',
+                    after: { path: ['articleId'], equals: articleId },
+                },
+            ],
+        };
+        const client = this.client(tx);
+        const [rows, total] = await Promise.all([
+            client.auditLog.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+            }),
+            client.auditLog.count({ where }),
+        ]);
+        return {
+            items: rows.map((r) => this.mapper.toDomain(r)),
+            total,
+        };
+    }
 };
 exports.PrismaAuditLogRepository = PrismaAuditLogRepository;
 exports.PrismaAuditLogRepository = PrismaAuditLogRepository = __decorate([

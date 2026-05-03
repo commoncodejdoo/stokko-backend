@@ -52,6 +52,10 @@ export class UsersService {
     return this.repo.findAllByEmail(email, tx);
   }
 
+  async listByOrg(organizationId: string, tx?: TxClient): Promise<User[]> {
+    return this.repo.listByOrg(organizationId, tx);
+  }
+
   /**
    * Creates a user with a freshly generated temporary password.
    * Caller (Owner or super-admin CLI) receives the plaintext via the

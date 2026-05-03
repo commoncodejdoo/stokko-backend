@@ -22,4 +22,21 @@ export abstract class AuditLogRepository {
     pageSize: number,
     tx?: TxClient,
   ): Promise<{ items: AuditLogEntry[]; total: number }>;
+
+  /**
+   * Article history — every audit entry that references this article:
+   *  - Direct entries (entityType='Article', entityId=articleId)
+   *  - Stock corrections for this article (entityType='StockCorrection',
+   *    after.articleId = articleId)
+   *
+   * Procurement entries are intentionally excluded for MVP — their items
+   * array would require a more involved JSONB query.
+   */
+  abstract findArticleHistory(
+    organizationId: string,
+    articleId: string,
+    page: number,
+    pageSize: number,
+    tx?: TxClient,
+  ): Promise<{ items: AuditLogEntry[]; total: number }>;
 }

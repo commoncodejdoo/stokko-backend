@@ -32,4 +32,13 @@ export class AuditLogService {
   ): Promise<{ items: AuditLogEntry[]; total: number }> {
     return this.repo.findByEntity(organizationId, entityType, entityId, page, pageSize);
   }
+
+  async listArticleHistory(
+    organizationId: string,
+    articleId: string,
+    page = 1,
+    pageSize = 50,
+  ): Promise<{ items: AuditLogEntry[]; total: number }> {
+    return this.repo.findArticleHistory(organizationId, articleId, page, pageSize);
+  }
 }

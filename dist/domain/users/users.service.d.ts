@@ -24,6 +24,7 @@ export declare class UsersService {
     requireById(id: string, tx?: TxClient): Promise<User>;
     findByEmailInOrg(email: string, organizationId: string, tx?: TxClient): Promise<User | null>;
     findAllByEmail(email: string, tx?: TxClient): Promise<User[]>;
+    listByOrg(organizationId: string, tx?: TxClient): Promise<User[]>;
     invite(input: InviteUserInput, actorUserId: string | null, tx?: TxClient): Promise<InviteUserResult>;
     setPassword(userId: string, newPasswordHash: string, actorUserId: string, tx?: TxClient): Promise<User>;
 }

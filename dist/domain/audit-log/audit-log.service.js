@@ -26,6 +26,9 @@ let AuditLogService = class AuditLogService {
     async listByEntity(organizationId, entityType, entityId, page = 1, pageSize = 50) {
         return this.repo.findByEntity(organizationId, entityType, entityId, page, pageSize);
     }
+    async listArticleHistory(organizationId, articleId, page = 1, pageSize = 50) {
+        return this.repo.findArticleHistory(organizationId, articleId, page, pageSize);
+    }
 };
 exports.AuditLogService = AuditLogService;
 exports.AuditLogService = AuditLogService = __decorate([
