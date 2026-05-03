@@ -16,13 +16,14 @@ const users_service_1 = require("../../domain/users/users.service");
 const audit_log_module_1 = require("../audit-log/audit-log.module");
 const organizations_module_1 = require("../organizations/organizations.module");
 const users_controller_1 = require("./users.controller");
+const users_management_controller_1 = require("./users-management.controller");
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
         imports: [audit_log_module_1.AuditLogModule, organizations_module_1.OrganizationsModule],
-        controllers: [users_controller_1.UsersController],
+        controllers: [users_controller_1.UsersController, users_management_controller_1.UsersManagementController],
         providers: [
             { provide: users_repository_2.UsersRepository, useClass: users_repository_1.PrismaUsersRepository },
             { provide: password_hasher_2.PasswordHasher, useClass: password_hasher_1.BcryptPasswordHasher },

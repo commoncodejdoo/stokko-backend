@@ -7,10 +7,11 @@ import { UsersService } from '../../domain/users/users.service';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { UsersController } from './users.controller';
+import { UsersManagementController } from './users-management.controller';
 
 @Module({
   imports: [AuditLogModule, OrganizationsModule],
-  controllers: [UsersController],
+  controllers: [UsersController, UsersManagementController],
   providers: [
     { provide: UsersRepository, useClass: PrismaUsersRepository },
     { provide: PasswordHasher, useClass: BcryptPasswordHasher },

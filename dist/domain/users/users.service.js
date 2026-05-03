@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const audit_action_1 = require("../common/audit-action");
 const errors_1 = require("../common/errors");
 const password_hasher_1 = require("../common/password-hasher");
+const role_1 = require("../common/role");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const users_repository_1 = require("./users.repository");
 let UsersService = class UsersService {
@@ -75,6 +76,99 @@ let UsersService = class UsersService {
             after: after.toSnapshot(),
         }, tx);
         return after;
+    }
+    async requireInOrg(userId, organizationId, tx) {
+        const user = await this.requireById(userId, tx);
+        if (user.organizationId !== organizationId) {
+            throw new errors_1.CrossOrgAccessError('User', userId);
+        }
+        return user;
+    }
+    async updateProfile(userId, patch, actorUserId, tx) {
+        const before = await this.requireById(userId, tx);
+        if (before.role === role_1.Role.OWNER &&
+            patch.role !== undefined &&
+            patch.role !== role_1.Role.OWNER) {
+            const allOwners = (await this.repo.listByOrg(before.organizationId, tx)).filter((u) => u.role === role_1.Role.OWNER && u.isActive);
+            if (allOwners.length <= 1) {
+                throw new errors_1.DomainValidationError('Cannot demote the last active Owner of the organization', { userId });
+            }
+        }
+        const after = await this.repo.update(userId, {
+            firstName: patch.firstName,
+            lastName: patch.lastName,
+            role: patch.role,
+        }, tx);
+        if (patch.role !== undefined && patch.role !== before.role) {
+            await this.auditLog.record({
+                organizationId: before.organizationId,
+                userId: actorUserId,
+                action: audit_action_1.AuditAction.USER_ROLE_CHANGED,
+                entityType: 'User',
+                entityId: userId,
+                before: before.toSnapshot(),
+                after: after.toSnapshot(),
+            }, tx);
+        }
+        return after;
+    }
+    async deactivate(userId, actorUserId, tx) {
+        const before = await this.requireById(userId, tx);
+        if (!before.isActive)
+            return before;
+        if (before.id === actorUserId) {
+            throw new errors_1.DomainValidationError('You cannot deactivate your own account');
+        }
+        if (before.role === role_1.Role.OWNER) {
+            const activeOwners = (await this.repo.listByOrg(before.organizationId, tx))
+                .filter((u) => u.role === role_1.Role.OWNER && u.isActive);
+            if (activeOwners.length <= 1) {
+                throw new errors_1.DomainValidationError('Cannot deactivate the last active Owner of the organization', { userId });
+            }
+        }
+        const after = await this.repo.update(userId, { isActive: false }, tx);
+        await this.auditLog.record({
+            organizationId: before.organizationId,
+            userId: actorUserId,
+            action: audit_action_1.AuditAction.USER_DEACTIVATED,
+            entityType: 'User',
+            entityId: userId,
+            before: before.toSnapshot(),
+            after: after.toSnapshot(),
+        }, tx);
+        return after;
+    }
+    async reactivate(userId, actorUserId, tx) {
+        const before = await this.requireById(userId, tx);
+        if (before.isActive)
+            return before;
+        const after = await this.repo.update(userId, { isActive: true }, tx);
+        await this.auditLog.record({
+            organizationId: before.organizationId,
+            userId: actorUserId,
+            action: audit_action_1.AuditAction.USER_REACTIVATED,
+            entityType: 'User',
+            entityId: userId,
+            before: before.toSnapshot(),
+            after: after.toSnapshot(),
+        }, tx);
+        return after;
+    }
+    async resetPassword(userId, actorUserId, tx) {
+        const before = await this.requireById(userId, tx);
+        const temporaryPassword = this.hasher.generateTemporary();
+        const passwordHash = await this.hasher.hash(temporaryPassword);
+        const after = await this.repo.update(userId, { passwordHash, mustChangePassword: true }, tx);
+        await this.auditLog.record({
+            organizationId: before.organizationId,
+            userId: actorUserId,
+            action: audit_action_1.AuditAction.USER_PASSWORD_RESET,
+            entityType: 'User',
+            entityId: userId,
+            before: before.toSnapshot(),
+            after: after.toSnapshot(),
+        }, tx);
+        return { user: after, temporaryPassword };
     }
 };
 exports.UsersService = UsersService;

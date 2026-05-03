@@ -27,4 +27,16 @@ export declare class UsersService {
     listByOrg(organizationId: string, tx?: TxClient): Promise<User[]>;
     invite(input: InviteUserInput, actorUserId: string | null, tx?: TxClient): Promise<InviteUserResult>;
     setPassword(userId: string, newPasswordHash: string, actorUserId: string, tx?: TxClient): Promise<User>;
+    requireInOrg(userId: string, organizationId: string, tx?: TxClient): Promise<User>;
+    updateProfile(userId: string, patch: {
+        firstName?: string;
+        lastName?: string;
+        role?: Role;
+    }, actorUserId: string, tx?: TxClient): Promise<User>;
+    deactivate(userId: string, actorUserId: string, tx?: TxClient): Promise<User>;
+    reactivate(userId: string, actorUserId: string, tx?: TxClient): Promise<User>;
+    resetPassword(userId: string, actorUserId: string, tx?: TxClient): Promise<{
+        user: User;
+        temporaryPassword: string;
+    }>;
 }
