@@ -1,0 +1,58 @@
+# Stokko backend — Render IaC.
+# Deploy via "New → Blueprint" in Render dashboard, point at this file.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: stokko-backend
+    runtime: node
+    # Frankfurt is closest to the Neon eu-central-1 cluster — keeps
+    # round-trips low. Move to other regions if you migrate the DB.
+    region: frankfurt
+    # Free tier sleeps after 15 min idle (cold start ~30s). Bump to
+    # `starter` ($7/mo) for always-on.
+    plan: free
+    branch: main
+    # If the repo root contains both stokko-backend/ and stokko-mobile/,
+    # set rootDir so Render only watches/builds the backend folder.
+    # Drop this line if you push stokko-backend/ as its own repo.
+    rootDir: stokko-backend
+
+    buildCommand: |
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm prisma generate
+      pnpm build
+
+    # `migrate deploy` is idempotent — applies pending migrations only,
+    # never resets state. Safe to run on every boot.
+    startCommand: pnpm prisma migrate deploy && pnpm start:prod
+
+    healthCheckPath: /api/v1/health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.18.0
+
+      # Neon connection string — paste manually in Render dashboard.
+      # `sync: false` keeps it out of the IaC sync (sensitive).
+      - key: DATABASE_URL
+        sync: false
+
+      # JWT secrets — Render generates 256-bit random values once and
+      # locks them. Existing tokens issued by your local dev backend will
+      # be invalid against this prod instance (users will need to log in
+      # again on first prod use), but bcrypt password hashes are unaffected.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 30d
+      - key: BCRYPT_ROUNDS
+        value: "12"
