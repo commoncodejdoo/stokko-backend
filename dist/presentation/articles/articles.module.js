@@ -28,7 +28,7 @@ exports.ArticlesModule = ArticlesModule = __decorate([
             organizations_module_1.OrganizationsModule,
             categories_module_1.CategoriesModule,
             suppliers_module_1.SuppliersModule,
-            warehouses_module_1.WarehousesModule,
+            (0, common_1.forwardRef)(() => warehouses_module_1.WarehousesModule),
             stock_module_1.StockModule,
             audit_log_module_1.AuditLogModule,
             users_module_1.UsersModule,

@@ -30,6 +30,7 @@ export interface ListArticlesFilter {
     organizationId: string;
     search?: string;
     categoryId?: string;
+    supplierId?: string;
 }
 export declare abstract class ArticlesRepository {
     abstract create(input: CreateArticleInput, currency: string, tx?: TxClient): Promise<Article>;

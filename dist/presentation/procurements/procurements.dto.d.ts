@@ -4,7 +4,7 @@ declare class ProcurementItemDto {
     purchasePrice: string;
 }
 export declare class CreateProcurementDto {
-    supplierId: string;
+    supplierId?: string | null;
     warehouseId: string;
     note?: string;
     items: ProcurementItemDto[];
@@ -12,6 +12,7 @@ export declare class CreateProcurementDto {
 export declare class ListProcurementsQueryDto {
     supplierId?: string;
     warehouseId?: string;
+    createdSince?: string;
     page?: string;
     pageSize?: string;
 }

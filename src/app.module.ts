@@ -10,8 +10,10 @@ import { CorrectionsModule } from './presentation/corrections/corrections.module
 import { DashboardModule } from './presentation/dashboard/dashboard.module';
 import { OrganizationsModule } from './presentation/organizations/organizations.module';
 import { ProcurementsModule } from './presentation/procurements/procurements.module';
+import { SalesModule } from './presentation/sales/sales.module';
 import { StockModule } from './presentation/stock/stock.module';
 import { SuppliersModule } from './presentation/suppliers/suppliers.module';
+import { TransfersModule } from './presentation/transfers/transfers.module';
 import { UsersModule } from './presentation/users/users.module';
 import { WarehousesModule } from './presentation/warehouses/warehouses.module';
 
@@ -29,6 +31,8 @@ import { WarehousesModule } from './presentation/warehouses/warehouses.module';
     ArticlesModule,
     ProcurementsModule,
     CorrectionsModule,
+    TransfersModule,
+    SalesModule,
     UsersModule,
     AuthModule,
     DashboardModule,

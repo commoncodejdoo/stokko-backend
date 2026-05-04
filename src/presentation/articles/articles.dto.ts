@@ -79,6 +79,7 @@ export class UpdateArticleDto {
 export class ListArticlesQueryDto {
   @IsOptional() @IsString() q?: string;
   @IsOptional() @IsString() categoryId?: string;
+  @IsOptional() @IsString() supplierId?: string;
   /** "low" — only items with status WARNING or CRITICAL in any warehouse. */
   @IsOptional() @IsString() status?: 'low' | 'all';
   @IsOptional() @IsNumberString() page?: string;

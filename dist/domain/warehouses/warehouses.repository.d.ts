@@ -1,13 +1,15 @@
 import { TxClient } from '../common/transaction';
-import { Warehouse } from './warehouse.domain';
+import { Warehouse, WarehouseKind } from './warehouse.domain';
 export interface CreateWarehouseInput {
     organizationId: string;
     name: string;
     color: string;
+    kind?: WarehouseKind;
 }
 export interface UpdateWarehouseInput {
     name?: string;
     color?: string;
+    kind?: WarehouseKind;
 }
 export declare abstract class WarehousesRepository {
     abstract create(input: CreateWarehouseInput, tx?: TxClient): Promise<Warehouse>;

@@ -8,14 +8,16 @@ class Warehouse {
     organizationId;
     name;
     color;
+    kind;
     deletedAt;
     createdAt;
     updatedAt;
-    constructor(id, organizationId, name, color, deletedAt, createdAt, updatedAt) {
+    constructor(id, organizationId, name, color, kind, deletedAt, createdAt, updatedAt) {
         this.id = id;
         this.organizationId = organizationId;
         this.name = name;
         this.color = color;
+        this.kind = kind;
         this.deletedAt = deletedAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -25,6 +27,9 @@ class Warehouse {
         if (!HEX_RX.test(color)) {
             throw new errors_1.DomainValidationError(`Invalid hex color: "${color}"`, { color });
         }
+    }
+    isFoh() {
+        return this.kind === 'FOH';
     }
     initials() {
         const words = this.name.trim().split(/\s+/);
@@ -41,6 +46,7 @@ class Warehouse {
             organizationId: this.organizationId,
             name: this.name,
             color: this.color,
+            kind: this.kind,
             deletedAt: this.deletedAt?.toISOString() ?? null,
             createdAt: this.createdAt.toISOString(),
             updatedAt: this.updatedAt.toISOString(),

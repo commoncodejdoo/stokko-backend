@@ -4,7 +4,7 @@ import { AuditAction } from '../common/audit-action';
 import { AuthContext } from '../common/auth-context';
 import { CrossOrgAccessError, EntityNotFoundError } from '../common/errors';
 import { TxClient } from '../common/transaction';
-import { Warehouse } from './warehouse.domain';
+import { Warehouse, WarehouseKind } from './warehouse.domain';
 import {
   UpdateWarehouseInput,
   WarehousesRepository,
@@ -35,7 +35,7 @@ export class WarehousesService {
   }
 
   async create(
-    input: { name: string; color: string },
+    input: { name: string; color: string; kind?: WarehouseKind },
     ctx: AuthContext,
     tx?: TxClient,
   ): Promise<Warehouse> {

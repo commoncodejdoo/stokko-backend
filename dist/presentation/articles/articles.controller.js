@@ -41,6 +41,7 @@ let ArticlesController = class ArticlesController {
             organizationId: ctx.organizationId,
             search: q.q,
             categoryId: q.categoryId,
+            supplierId: q.supplierId,
         });
         const result = [];
         for (const a of articles) {

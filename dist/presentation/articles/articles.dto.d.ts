@@ -29,6 +29,7 @@ export declare class UpdateArticleDto {
 export declare class ListArticlesQueryDto {
     q?: string;
     categoryId?: string;
+    supplierId?: string;
     status?: 'low' | 'all';
     page?: string;
     pageSize?: string;

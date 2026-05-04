@@ -14,7 +14,12 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WarehousesController = void 0;
 const common_1 = require("@nestjs/common");
+const decimal_js_1 = require("decimal.js");
+const articles_service_1 = require("../../domain/articles/articles.service");
 const role_1 = require("../../domain/common/role");
+const stock_status_1 = require("../../domain/common/stock-status");
+const organizations_service_1 = require("../../domain/organizations/organizations.service");
+const stock_service_1 = require("../../domain/stock/stock.service");
 const warehouses_service_1 = require("../../domain/warehouses/warehouses.service");
 const current_user_decorator_1 = require("../common/auth/current-user.decorator");
 const jwt_auth_guard_1 = require("../common/auth/jwt-auth.guard");
@@ -23,8 +28,14 @@ const roles_guard_1 = require("../common/auth/roles.guard");
 const warehouses_dto_1 = require("./warehouses.dto");
 let WarehousesController = class WarehousesController {
     service;
-    constructor(service) {
+    articles;
+    stock;
+    orgs;
+    constructor(service, articles, stock, orgs) {
         this.service = service;
+        this.articles = articles;
+        this.stock = stock;
+        this.orgs = orgs;
     }
     async list(ctx) {
         const items = await this.service.list(ctx.organizationId);
@@ -45,11 +56,58 @@ let WarehousesController = class WarehousesController {
     async delete(id, ctx) {
         await this.service.softDelete(id, ctx);
     }
+    async listArticles(id, ctx) {
+        await this.service.requireById(id, ctx.organizationId);
+        const [stockEntries, allArticles] = await Promise.all([
+            this.stock.getByWarehouse(id),
+            this.articles.list({ organizationId: ctx.organizationId }),
+        ]);
+        const articleById = new Map(allArticles.map((a) => [a.id, a]));
+        const items = [];
+        let totalQuantity = new decimal_js_1.Decimal(0);
+        let totalValue = new decimal_js_1.Decimal(0);
+        let articleCount = 0;
+        for (const entry of stockEntries) {
+            const a = articleById.get(entry.articleId);
+            if (!a)
+                continue;
+            const status = (0, stock_status_1.computeStockStatus)(entry.quantity, a.thresholdWarning, a.thresholdCritical);
+            items.push({
+                articleId: a.id,
+                sku: a.sku,
+                name: a.name,
+                unit: a.unit,
+                categoryId: a.categoryId,
+                supplierId: a.supplierId,
+                quantity: entry.quantity.toFixed(3),
+                status,
+                purchasePrice: a.purchasePrice.toFixed(),
+                currency: a.purchasePrice.currency,
+            });
+            if (!entry.quantity.isZero()) {
+                articleCount += 1;
+                totalQuantity = totalQuantity.plus(entry.quantity);
+                totalValue = totalValue.plus(entry.quantity.times(a.purchasePrice.amount));
+            }
+        }
+        items.sort((x, y) => x.name.localeCompare(y.name, 'hr'));
+        const org = await this.orgs.requireById(ctx.organizationId);
+        return {
+            items,
+            summary: {
+                articleCount,
+                totalQuantity: totalQuantity.toFixed(3),
+                totalValue: totalValue.toFixed(2),
+                currency: org.currency,
+            },
+        };
+    }
     toPublic(wh) {
         return {
             id: wh.id,
             name: wh.name,
             color: wh.color,
+            kind: wh.kind,
             initials: wh.initials(),
         };
     }
@@ -99,9 +157,20 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], WarehousesController.prototype, "delete", null);
+__decorate([
+    (0, common_1.Get)(':id/articles'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], WarehousesController.prototype, "listArticles", null);
 exports.WarehousesController = WarehousesController = __decorate([
     (0, common_1.Controller)('warehouses'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    __metadata("design:paramtypes", [warehouses_service_1.WarehousesService])
+    __metadata("design:paramtypes", [warehouses_service_1.WarehousesService,
+        articles_service_1.ArticlesService,
+        stock_service_1.StockService,
+        organizations_service_1.OrganizationsService])
 ], WarehousesController);
 //# sourceMappingURL=warehouses.controller.js.map

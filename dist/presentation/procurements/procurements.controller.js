@@ -26,10 +26,12 @@ let ProcurementsController = class ProcurementsController {
     async list(q, ctx) {
         const page = q.page ? Number(q.page) : 1;
         const pageSize = q.pageSize ? Number(q.pageSize) : 50;
+        const createdSince = q.createdSince ? new Date(q.createdSince) : undefined;
         const { items, total } = await this.service.list({
             organizationId: ctx.organizationId,
             supplierId: q.supplierId,
             warehouseId: q.warehouseId,
+            createdSince,
             page,
             pageSize,
         });

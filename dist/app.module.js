@@ -19,8 +19,10 @@ const corrections_module_1 = require("./presentation/corrections/corrections.mod
 const dashboard_module_1 = require("./presentation/dashboard/dashboard.module");
 const organizations_module_1 = require("./presentation/organizations/organizations.module");
 const procurements_module_1 = require("./presentation/procurements/procurements.module");
+const sales_module_1 = require("./presentation/sales/sales.module");
 const stock_module_1 = require("./presentation/stock/stock.module");
 const suppliers_module_1 = require("./presentation/suppliers/suppliers.module");
+const transfers_module_1 = require("./presentation/transfers/transfers.module");
 const users_module_1 = require("./presentation/users/users.module");
 const warehouses_module_1 = require("./presentation/warehouses/warehouses.module");
 let AppModule = class AppModule {
@@ -41,6 +43,8 @@ exports.AppModule = AppModule = __decorate([
             articles_module_1.ArticlesModule,
             procurements_module_1.ProcurementsModule,
             corrections_module_1.CorrectionsModule,
+            transfers_module_1.TransfersModule,
+            sales_module_1.SalesModule,
             users_module_1.UsersModule,
             auth_module_1.AuthModule,
             dashboard_module_1.DashboardModule,

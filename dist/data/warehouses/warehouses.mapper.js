@@ -4,7 +4,7 @@ exports.WarehousesMapper = void 0;
 const warehouse_domain_1 = require("../../domain/warehouses/warehouse.domain");
 class WarehousesMapper {
     toDomain(p) {
-        return new warehouse_domain_1.Warehouse(p.id, p.organizationId, p.name, p.color, p.deletedAt, p.createdAt, p.updatedAt);
+        return new warehouse_domain_1.Warehouse(p.id, p.organizationId, p.name, p.color, p.kind, p.deletedAt, p.createdAt, p.updatedAt);
     }
 }
 exports.WarehousesMapper = WarehousesMapper;

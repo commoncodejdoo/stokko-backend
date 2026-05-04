@@ -7,7 +7,7 @@ export declare class ProcurementsController {
     list(q: ListProcurementsQueryDto, ctx: AuthContext): Promise<{
         items: {
             id: string;
-            supplierId: string;
+            supplierId: string | null;
             warehouseId: string;
             createdById: string;
             note: string | null;
@@ -30,7 +30,7 @@ export declare class ProcurementsController {
     }>;
     detail(id: string, ctx: AuthContext): Promise<{
         id: string;
-        supplierId: string;
+        supplierId: string | null;
         warehouseId: string;
         createdById: string;
         note: string | null;
@@ -47,7 +47,7 @@ export declare class ProcurementsController {
     }>;
     create(body: CreateProcurementDto, ctx: AuthContext): Promise<{
         id: string;
-        supplierId: string;
+        supplierId: string | null;
         warehouseId: string;
         createdById: string;
         note: string | null;

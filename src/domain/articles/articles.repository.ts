@@ -33,6 +33,7 @@ export interface ListArticlesFilter {
   organizationId: string;
   search?: string;
   categoryId?: string;
+  supplierId?: string;
 }
 
 export abstract class ArticlesRepository {

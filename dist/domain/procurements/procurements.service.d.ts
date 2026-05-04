@@ -16,7 +16,7 @@ export interface CreateProcurementItemCommand {
     purchasePrice: string | number | Decimal;
 }
 export interface CreateProcurementCommand {
-    supplierId: string;
+    supplierId?: string | null;
     warehouseId: string;
     note?: string;
     items: CreateProcurementItemCommand[];

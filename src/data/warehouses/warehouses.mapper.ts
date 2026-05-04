@@ -8,6 +8,7 @@ export class WarehousesMapper {
       p.organizationId,
       p.name,
       p.color,
+      p.kind,
       p.deletedAt,
       p.createdAt,
       p.updatedAt,

@@ -41,6 +41,7 @@ export class ArticlesController {
       organizationId: ctx.organizationId,
       search: q.q,
       categoryId: q.categoryId,
+      supplierId: q.supplierId,
     });
 
     // Attach stock for each article.

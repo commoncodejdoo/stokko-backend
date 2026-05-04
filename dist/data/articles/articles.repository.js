@@ -58,6 +58,8 @@ let PrismaArticlesRepository = class PrismaArticlesRepository extends articles_r
         };
         if (filter.categoryId)
             where.categoryId = filter.categoryId;
+        if (filter.supplierId)
+            where.supplierId = filter.supplierId;
         if (filter.search) {
             const q = filter.search.trim();
             where.OR = [

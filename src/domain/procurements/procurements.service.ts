@@ -30,7 +30,7 @@ export interface CreateProcurementItemCommand {
 }
 
 export interface CreateProcurementCommand {
-  supplierId: string;
+  supplierId?: string | null;
   warehouseId: string;
   note?: string;
   items: CreateProcurementItemCommand[];
@@ -70,7 +70,10 @@ export class ProcurementsService {
       const org = await this.orgs.requireById(ctx.organizationId, tx);
 
       // Validate FKs.
-      await this.suppliers.requireById(cmd.supplierId, ctx.organizationId, tx);
+      const supplierId = cmd.supplierId ?? null;
+      if (supplierId) {
+        await this.suppliers.requireById(supplierId, ctx.organizationId, tx);
+      }
       await this.warehouses.requireById(cmd.warehouseId, ctx.organizationId, tx);
       for (const item of cmd.items) {
         await this.articles.requireById(item.articleId, ctx.organizationId, tx);
@@ -79,7 +82,7 @@ export class ProcurementsService {
       const created = await this.repo.create(
         {
           organizationId: ctx.organizationId,
-          supplierId: cmd.supplierId,
+          supplierId,
           warehouseId: cmd.warehouseId,
           createdById: ctx.userId,
           note: cmd.note ?? null,

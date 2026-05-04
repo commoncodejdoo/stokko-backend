@@ -1,12 +1,22 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PrismaWarehousesRepository } from '../../data/warehouses/warehouses.repository';
 import { WarehousesRepository } from '../../domain/warehouses/warehouses.repository';
 import { WarehousesService } from '../../domain/warehouses/warehouses.service';
+import { ArticlesModule } from '../articles/articles.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
+import { StockModule } from '../stock/stock.module';
 import { WarehousesController } from './warehouses.controller';
 
 @Module({
-  imports: [AuditLogModule],
+  imports: [
+    AuditLogModule,
+    StockModule,
+    OrganizationsModule,
+    // ArticlesModule already depends on WarehousesModule (for stock seeding
+    // on article create); use forwardRef to break the circular import.
+    forwardRef(() => ArticlesModule),
+  ],
   controllers: [WarehousesController],
   providers: [
     { provide: WarehousesRepository, useClass: PrismaWarehousesRepository },

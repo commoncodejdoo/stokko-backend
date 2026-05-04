@@ -9,11 +9,17 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateWarehouseDto = exports.CreateWarehouseDto = void 0;
+exports.UpdateWarehouseDto = exports.CreateWarehouseDto = exports.WarehouseKindDto = void 0;
 const class_validator_1 = require("class-validator");
+var WarehouseKindDto;
+(function (WarehouseKindDto) {
+    WarehouseKindDto["STORAGE"] = "STORAGE";
+    WarehouseKindDto["FOH"] = "FOH";
+})(WarehouseKindDto || (exports.WarehouseKindDto = WarehouseKindDto = {}));
 class CreateWarehouseDto {
     name;
     color;
+    kind;
 }
 exports.CreateWarehouseDto = CreateWarehouseDto;
 __decorate([
@@ -26,9 +32,15 @@ __decorate([
     (0, class_validator_1.IsHexColor)(),
     __metadata("design:type", String)
 ], CreateWarehouseDto.prototype, "color", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(WarehouseKindDto),
+    __metadata("design:type", String)
+], CreateWarehouseDto.prototype, "kind", void 0);
 class UpdateWarehouseDto {
     name;
     color;
+    kind;
 }
 exports.UpdateWarehouseDto = UpdateWarehouseDto;
 __decorate([
@@ -43,4 +55,9 @@ __decorate([
     (0, class_validator_1.IsHexColor)(),
     __metadata("design:type", String)
 ], UpdateWarehouseDto.prototype, "color", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(WarehouseKindDto),
+    __metadata("design:type", String)
+], UpdateWarehouseDto.prototype, "kind", void 0);
 //# sourceMappingURL=warehouses.dto.js.map

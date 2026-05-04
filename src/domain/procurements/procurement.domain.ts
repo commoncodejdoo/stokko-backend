@@ -12,7 +12,7 @@ export class Procurement {
   constructor(
     readonly id: string,
     readonly organizationId: string,
-    readonly supplierId: string,
+    readonly supplierId: string | null,
     readonly warehouseId: string,
     readonly createdById: string,
     readonly note: string | null,

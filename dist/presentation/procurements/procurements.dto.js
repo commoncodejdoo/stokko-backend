@@ -38,9 +38,10 @@ class CreateProcurementDto {
 }
 exports.CreateProcurementDto = CreateProcurementDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateProcurementDto.prototype, "supplierId", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
@@ -63,6 +64,7 @@ __decorate([
 class ListProcurementsQueryDto {
     supplierId;
     warehouseId;
+    createdSince;
     page;
     pageSize;
 }
@@ -77,6 +79,11 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], ListProcurementsQueryDto.prototype, "warehouseId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ListProcurementsQueryDto.prototype, "createdSince", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsNumberString)(),

@@ -10,7 +10,7 @@ export interface CreateProcurementItemInput {
 
 export interface CreateProcurementInput {
   organizationId: string;
-  supplierId: string;
+  supplierId: string | null;
   warehouseId: string;
   createdById: string;
   note?: string | null;
@@ -21,6 +21,8 @@ export interface ListProcurementsFilter {
   organizationId: string;
   supplierId?: string;
   warehouseId?: string;
+  /** Inclusive lower bound on `createdAt`. Used for "Danas" / "Ovaj tjedan" filters. */
+  createdSince?: Date;
   page?: number;
   pageSize?: number;
 }

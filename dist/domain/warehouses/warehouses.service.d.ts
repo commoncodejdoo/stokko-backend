@@ -1,7 +1,7 @@
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AuthContext } from '../common/auth-context';
 import { TxClient } from '../common/transaction';
-import { Warehouse } from './warehouse.domain';
+import { Warehouse, WarehouseKind } from './warehouse.domain';
 import { UpdateWarehouseInput, WarehousesRepository } from './warehouses.repository';
 export declare class WarehousesService {
     private readonly repo;
@@ -13,6 +13,7 @@ export declare class WarehousesService {
     create(input: {
         name: string;
         color: string;
+        kind?: WarehouseKind;
     }, ctx: AuthContext, tx?: TxClient): Promise<Warehouse>;
     update(id: string, patch: UpdateWarehouseInput, ctx: AuthContext, tx?: TxClient): Promise<Warehouse>;
     softDelete(id: string, ctx: AuthContext, tx?: TxClient): Promise<void>;

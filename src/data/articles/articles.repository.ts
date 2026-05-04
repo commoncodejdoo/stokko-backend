@@ -63,6 +63,7 @@ export class PrismaArticlesRepository extends ArticlesRepository {
       ...whereNotDeleted(),
     };
     if (filter.categoryId) where.categoryId = filter.categoryId;
+    if (filter.supplierId) where.supplierId = filter.supplierId;
     if (filter.search) {
       const q = filter.search.trim();
       where.OR = [

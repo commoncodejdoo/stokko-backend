@@ -31,7 +31,7 @@ export class PrismaProcurementsRepository extends ProcurementsRepository {
     const row = await this.client(tx).procurement.create({
       data: {
         organizationId: input.organizationId,
-        supplierId: input.supplierId,
+        supplierId: input.supplierId ?? null,
         warehouseId: input.warehouseId,
         createdById: input.createdById,
         note: input.note ?? null,
@@ -76,6 +76,7 @@ export class PrismaProcurementsRepository extends ProcurementsRepository {
     };
     if (filter.supplierId) where.supplierId = filter.supplierId;
     if (filter.warehouseId) where.warehouseId = filter.warehouseId;
+    if (filter.createdSince) where.createdAt = { gte: filter.createdSince };
 
     const page = filter.page ?? 1;
     const pageSize = filter.pageSize ?? 50;

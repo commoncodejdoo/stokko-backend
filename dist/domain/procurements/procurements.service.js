@@ -47,14 +47,17 @@ let ProcurementsService = class ProcurementsService {
         }
         return this.prisma.$transaction(async (tx) => {
             const org = await this.orgs.requireById(ctx.organizationId, tx);
-            await this.suppliers.requireById(cmd.supplierId, ctx.organizationId, tx);
+            const supplierId = cmd.supplierId ?? null;
+            if (supplierId) {
+                await this.suppliers.requireById(supplierId, ctx.organizationId, tx);
+            }
             await this.warehouses.requireById(cmd.warehouseId, ctx.organizationId, tx);
             for (const item of cmd.items) {
                 await this.articles.requireById(item.articleId, ctx.organizationId, tx);
             }
             const created = await this.repo.create({
                 organizationId: ctx.organizationId,
-                supplierId: cmd.supplierId,
+                supplierId,
                 warehouseId: cmd.warehouseId,
                 createdById: ctx.userId,
                 note: cmd.note ?? null,

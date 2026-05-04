@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PrismaArticlesRepository } from '../../data/articles/articles.repository';
 import { ArticlesRepository } from '../../domain/articles/articles.repository';
 import { ArticlesService } from '../../domain/articles/articles.service';
@@ -16,7 +16,10 @@ import { ArticlesController } from './articles.controller';
     OrganizationsModule,
     CategoriesModule,
     SuppliersModule,
-    WarehousesModule,
+    // WarehousesModule depends on ArticlesService for the
+    // `GET /warehouses/:id/articles` enrichment endpoint, which creates a
+    // cycle. forwardRef breaks it on both sides.
+    forwardRef(() => WarehousesModule),
     StockModule,
     AuditLogModule,
     UsersModule,

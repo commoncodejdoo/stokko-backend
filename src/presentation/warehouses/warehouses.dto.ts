@@ -1,4 +1,9 @@
-import { IsHexColor, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsHexColor, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+
+export enum WarehouseKindDto {
+  STORAGE = 'STORAGE',
+  FOH = 'FOH',
+}
 
 export class CreateWarehouseDto {
   @IsString()
@@ -8,6 +13,10 @@ export class CreateWarehouseDto {
 
   @IsHexColor()
   color!: string;
+
+  @IsOptional()
+  @IsEnum(WarehouseKindDto)
+  kind?: WarehouseKindDto;
 }
 
 export class UpdateWarehouseDto {
@@ -20,4 +29,8 @@ export class UpdateWarehouseDto {
   @IsOptional()
   @IsHexColor()
   color?: string;
+
+  @IsOptional()
+  @IsEnum(WarehouseKindDto)
+  kind?: WarehouseKindDto;
 }
