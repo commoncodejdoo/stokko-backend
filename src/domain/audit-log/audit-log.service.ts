@@ -41,4 +41,10 @@ export class AuditLogService {
   ): Promise<{ items: AuditLogEntry[]; total: number }> {
     return this.repo.findArticleHistory(organizationId, articleId, page, pageSize);
   }
+
+  async listPaginated(
+    opts: { organizationId?: string; page: number; pageSize: number },
+  ): Promise<{ items: AuditLogEntry[]; total: number }> {
+    return this.repo.listPaginated(opts);
+  }
 }

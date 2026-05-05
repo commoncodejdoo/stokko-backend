@@ -73,6 +73,24 @@ export class PrismaAuditLogRepository extends AuditLogRepository {
     };
   }
 
+  async listPaginated(
+    opts: { organizationId?: string; page: number; pageSize: number },
+    tx?: TxClient,
+  ): Promise<{ items: AuditLogEntry[]; total: number }> {
+    const where = opts.organizationId ? { organizationId: opts.organizationId } : {};
+    const client = this.client(tx);
+    const [rows, total] = await Promise.all([
+      client.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (opts.page - 1) * opts.pageSize,
+        take: opts.pageSize,
+      }),
+      client.auditLog.count({ where }),
+    ]);
+    return { items: rows.map((r) => this.mapper.toDomain(r)), total };
+  }
+
   async findArticleHistory(
     organizationId: string,
     articleId: string,

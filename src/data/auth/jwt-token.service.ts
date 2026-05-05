@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import {
   AccessTokenClaims,
   AccessTokenPayload,
+  AdminTokenClaims,
+  AdminTokenPayload,
   JwtTokenService,
   PasswordChangeTokenClaims,
   PasswordChangeTokenPayload,
@@ -75,5 +77,22 @@ export class NestJwtTokenService extends JwtTokenService {
       if (err instanceof PasswordChangeTokenInvalidError) throw err;
       throw new PasswordChangeTokenInvalidError();
     }
+  }
+
+  async issueAdminToken(claims: AdminTokenClaims): Promise<string> {
+    return this.jwt.signAsync(
+      { sub: claims.adminId, adminId: claims.adminId, type: 'platform-admin' },
+      { secret: this.secret, expiresIn: '7d' },
+    );
+  }
+
+  async verifyAdminToken(token: string): Promise<AdminTokenPayload> {
+    const payload = await this.jwt.verifyAsync<AdminTokenPayload>(token, {
+      secret: this.secret,
+    });
+    if (payload.type !== 'platform-admin') {
+      throw new Error('Wrong token type');
+    }
+    return payload;
   }
 }

@@ -85,6 +85,16 @@ enum AuditAction {
   USER_LOGGED_IN
 }
 
+// ───────────── PLATFORM ADMIN ─────────────
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 // ───────────── CORE ─────────────
 
 model Organization {

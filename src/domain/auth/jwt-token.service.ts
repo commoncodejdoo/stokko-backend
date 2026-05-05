@@ -23,6 +23,16 @@ export interface PasswordChangeTokenPayload extends PasswordChangeTokenClaims {
   exp: number;
 }
 
+export interface AdminTokenClaims {
+  adminId: string;
+}
+
+export interface AdminTokenPayload extends AdminTokenClaims {
+  type: 'platform-admin';
+  iat: number;
+  exp: number;
+}
+
 /**
  * Abstraction over JWT signing/verification. Concrete implementation
  * lives in `data/auth/jwt-token.service.ts` and is backed by
@@ -37,4 +47,7 @@ export abstract class JwtTokenService {
 
   abstract issuePasswordChangeToken(claims: PasswordChangeTokenClaims): Promise<string>;
   abstract verifyPasswordChangeToken(token: string): Promise<PasswordChangeTokenPayload>;
+
+  abstract issueAdminToken(claims: AdminTokenClaims): Promise<string>;
+  abstract verifyAdminToken(token: string): Promise<AdminTokenPayload>;
 }

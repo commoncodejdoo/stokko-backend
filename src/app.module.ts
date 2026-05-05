@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './data/common/prisma/prisma.module';
+import { AdminModule } from './presentation/admin/admin.module';
 import { ArticlesModule } from './presentation/articles/articles.module';
 import { AuditLogModule } from './presentation/audit-log/audit-log.module';
 import { AuthModule } from './presentation/auth/auth.module';
@@ -36,6 +37,7 @@ import { WarehousesModule } from './presentation/warehouses/warehouses.module';
     UsersModule,
     AuthModule,
     DashboardModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

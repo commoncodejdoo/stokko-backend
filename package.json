@@ -30,7 +30,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "create-org": "ts-node -P tsconfig.json scripts/create-org.ts"
+    "create-org": "ts-node -P tsconfig.json scripts/create-org.ts",
+    "create-admin": "ts-node -P tsconfig.json scripts/create-admin.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

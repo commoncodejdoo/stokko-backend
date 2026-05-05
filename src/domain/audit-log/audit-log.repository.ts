@@ -39,4 +39,9 @@ export abstract class AuditLogRepository {
     pageSize: number,
     tx?: TxClient,
   ): Promise<{ items: AuditLogEntry[]; total: number }>;
+
+  abstract listPaginated(
+    opts: { organizationId?: string; page: number; pageSize: number },
+    tx?: TxClient,
+  ): Promise<{ items: AuditLogEntry[]; total: number }>;
 }
