@@ -71,6 +71,7 @@ export class User {
       initials: this.initials(),
       mustChangePassword: this.mustChangePassword,
       isActive: this.isActive,
+      createdAt: this.createdAt.toISOString(),
     };
   }
 }
