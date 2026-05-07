@@ -81,6 +81,10 @@ export class DashboardService {
     private readonly users: UsersService,
   ) {}
 
+  // TODO(server-rbac): filter recentActivity to OWNER/ADMIN once a dedicated
+  // /audit-log endpoint exists. Mobile currently hides the Aktivnosti card
+  // for EMPLOYEE in dashboard.screen.tsx; backend still returns the full
+  // payload so it's not a hard guarantee.
   async getOverview(organizationId: string): Promise<DashboardOverview> {
     const org = await this.orgs.requireById(organizationId);
     const currency = org.currency;
