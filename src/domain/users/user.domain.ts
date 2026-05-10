@@ -23,6 +23,7 @@ export class User {
     readonly isActive: boolean,
     readonly createdAt: Date,
     readonly updatedAt: Date,
+    readonly lastLoginAt: Date | null = null,
   ) {
     if (!EMAIL_RX.test(email)) {
       throw new DomainValidationError(`Invalid email: "${email}"`, { email });
@@ -55,6 +56,7 @@ export class User {
       isActive: this.isActive,
       createdAt: this.createdAt.toISOString(),
       updatedAt: this.updatedAt.toISOString(),
+      lastLoginAt: this.lastLoginAt?.toISOString() ?? null,
     };
   }
 
@@ -72,6 +74,7 @@ export class User {
       mustChangePassword: this.mustChangePassword,
       isActive: this.isActive,
       createdAt: this.createdAt.toISOString(),
+      lastLoginAt: this.lastLoginAt?.toISOString() ?? null,
     };
   }
 }

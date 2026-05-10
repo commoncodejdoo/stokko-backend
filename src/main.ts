@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './presentation/common/filters/global-exception.filter';
+import { ReadOnlySessionInterceptor } from './presentation/common/interceptors/read-only-session.interceptor';
 import { TransformDecimalInterceptor } from './presentation/common/interceptors/transform-decimal.interceptor';
 
 async function bootstrap(): Promise<void> {
@@ -31,7 +32,10 @@ async function bootstrap(): Promise<void> {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new TransformDecimalInterceptor());
+  app.useGlobalInterceptors(
+    new ReadOnlySessionInterceptor(),
+    new TransformDecimalInterceptor(),
+  );
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);

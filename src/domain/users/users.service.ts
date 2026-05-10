@@ -61,6 +61,15 @@ export class UsersService {
   }
 
   /**
+   * Records a successful login by stamping `lastLoginAt`. Called from
+   * AuthService.login() after a successful credential verification.
+   * No audit entry — the `USER_LOGGED_IN` audit covers that.
+   */
+  async recordLogin(userId: string, tx?: TxClient): Promise<void> {
+    await this.repo.update(userId, { lastLoginAt: new Date() }, tx);
+  }
+
+  /**
    * Creates a user with a freshly generated temporary password.
    * Caller (Owner or super-admin CLI) receives the plaintext via the
    * return value and is responsible for delivering it to the new user.
@@ -134,6 +143,20 @@ export class UsersService {
   }
 
   /**
+   * Resolves an actor user id. For tenant-driven actions a real userId is
+   * always provided. For platform-admin-driven actions the admin is not a
+   * `User` (FK on `AuditLog.userId`), so we fall back to the target user
+   * — mirroring the bootstrap pattern in `invite(... actorUserId=null)`.
+   *
+   * The action enum (`ADMIN_USER_*`) marks the entry as admin-driven, and
+   * the `after.meta.byAdmin` flag added by callers preserves traceability
+   * until a dedicated `AdminAuditLog` table lands in Phase A6.
+   */
+  private resolveActor(actorUserId: string | null, targetUserId: string): string {
+    return actorUserId ?? targetUserId;
+  }
+
+  /**
    * Cross-org-safe lookup. Use from controllers that take `:id` and need
    * to confirm the target user belongs to the caller's org.
    */
@@ -160,7 +183,7 @@ export class UsersService {
   async updateProfile(
     userId: string,
     patch: { firstName?: string; lastName?: string; role?: Role },
-    actorUserId: string,
+    actorUserId: string | null,
     tx?: TxClient,
   ): Promise<User> {
     const before = await this.requireById(userId, tx);
@@ -192,16 +215,22 @@ export class UsersService {
       tx,
     );
 
-    if (patch.role !== undefined && patch.role !== before.role) {
+    const isAdminActor = actorUserId === null;
+    if (
+      isAdminActor ||
+      (patch.role !== undefined && patch.role !== before.role)
+    ) {
       await this.auditLog.record(
         {
           organizationId: before.organizationId,
-          userId: actorUserId,
-          action: AuditAction.USER_ROLE_CHANGED,
+          userId: this.resolveActor(actorUserId, userId),
+          action: isAdminActor
+            ? AuditAction.ADMIN_USER_UPDATED
+            : AuditAction.USER_ROLE_CHANGED,
           entityType: 'User',
           entityId: userId,
           before: before.toSnapshot(),
-          after: after.toSnapshot(),
+          after: { ...after.toSnapshot(), ...(isAdminActor ? { _byAdmin: true } : {}) },
         },
         tx,
       );
@@ -211,13 +240,13 @@ export class UsersService {
 
   async deactivate(
     userId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     tx?: TxClient,
   ): Promise<User> {
     const before = await this.requireById(userId, tx);
     if (!before.isActive) return before;
 
-    if (before.id === actorUserId) {
+    if (actorUserId !== null && before.id === actorUserId) {
       throw new DomainValidationError('You cannot deactivate your own account');
     }
 
@@ -233,15 +262,18 @@ export class UsersService {
     }
 
     const after = await this.repo.update(userId, { isActive: false }, tx);
+    const isAdminActor = actorUserId === null;
     await this.auditLog.record(
       {
         organizationId: before.organizationId,
-        userId: actorUserId,
-        action: AuditAction.USER_DEACTIVATED,
+        userId: this.resolveActor(actorUserId, userId),
+        action: isAdminActor
+          ? AuditAction.ADMIN_USER_DEACTIVATED
+          : AuditAction.USER_DEACTIVATED,
         entityType: 'User',
         entityId: userId,
         before: before.toSnapshot(),
-        after: after.toSnapshot(),
+        after: { ...after.toSnapshot(), ...(isAdminActor ? { _byAdmin: true } : {}) },
       },
       tx,
     );
@@ -250,21 +282,24 @@ export class UsersService {
 
   async reactivate(
     userId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     tx?: TxClient,
   ): Promise<User> {
     const before = await this.requireById(userId, tx);
     if (before.isActive) return before;
     const after = await this.repo.update(userId, { isActive: true }, tx);
+    const isAdminActor = actorUserId === null;
     await this.auditLog.record(
       {
         organizationId: before.organizationId,
-        userId: actorUserId,
-        action: AuditAction.USER_REACTIVATED,
+        userId: this.resolveActor(actorUserId, userId),
+        action: isAdminActor
+          ? AuditAction.ADMIN_USER_REACTIVATED
+          : AuditAction.USER_REACTIVATED,
         entityType: 'User',
         entityId: userId,
         before: before.toSnapshot(),
-        after: after.toSnapshot(),
+        after: { ...after.toSnapshot(), ...(isAdminActor ? { _byAdmin: true } : {}) },
       },
       tx,
     );
@@ -272,13 +307,17 @@ export class UsersService {
   }
 
   /**
-   * Owner-only — generates a fresh temporary password, persists its hash,
-   * sets `mustChangePassword=true`, and returns the plaintext for the
-   * Owner to deliver to the user. Records `USER_PASSWORD_RESET`.
+   * Owner- or admin-triggered — generates a fresh temporary password,
+   * persists its hash, sets `mustChangePassword=true`, and returns the
+   * plaintext for the caller to deliver to the user.
+   *
+   * Pass `actorUserId=null` when invoked from the platform-admin app —
+   * the audit entry uses `ADMIN_USER_PASSWORD_RESET` instead of
+   * `USER_PASSWORD_RESET`.
    */
   async resetPassword(
     userId: string,
-    actorUserId: string,
+    actorUserId: string | null,
     tx?: TxClient,
   ): Promise<{ user: User; temporaryPassword: string }> {
     const before = await this.requireById(userId, tx);
@@ -289,15 +328,18 @@ export class UsersService {
       { passwordHash, mustChangePassword: true },
       tx,
     );
+    const isAdminActor = actorUserId === null;
     await this.auditLog.record(
       {
         organizationId: before.organizationId,
-        userId: actorUserId,
-        action: AuditAction.USER_PASSWORD_RESET,
+        userId: this.resolveActor(actorUserId, userId),
+        action: isAdminActor
+          ? AuditAction.ADMIN_USER_PASSWORD_RESET
+          : AuditAction.USER_PASSWORD_RESET,
         entityType: 'User',
         entityId: userId,
         before: before.toSnapshot(),
-        after: after.toSnapshot(),
+        after: { ...after.toSnapshot(), ...(isAdminActor ? { _byAdmin: true } : {}) },
       },
       tx,
     );

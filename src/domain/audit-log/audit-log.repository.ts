@@ -41,7 +41,21 @@ export abstract class AuditLogRepository {
   ): Promise<{ items: AuditLogEntry[]; total: number }>;
 
   abstract listPaginated(
-    opts: { organizationId?: string; page: number; pageSize: number },
+    opts: ListPaginatedOptions,
     tx?: TxClient,
   ): Promise<{ items: AuditLogEntry[]; total: number }>;
+}
+
+export interface ListPaginatedOptions {
+  organizationId?: string;
+  /** Filter by one or more audit actions. */
+  actions?: string[];
+  entityType?: string;
+  userId?: string;
+  /** ISO date — inclusive lower bound on `createdAt`. */
+  dateFrom?: Date;
+  /** ISO date — exclusive upper bound on `createdAt`. */
+  dateTo?: Date;
+  page: number;
+  pageSize: number;
 }

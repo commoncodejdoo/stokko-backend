@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TxClient } from '../common/transaction';
 import { AuditLogEntry, AuditLogInput } from './audit-log.domain';
-import { AuditLogRepository } from './audit-log.repository';
+import { AuditLogRepository, ListPaginatedOptions } from './audit-log.repository';
 
 /**
  * AuditLogService — every write-side service injects this and calls
@@ -43,7 +43,7 @@ export class AuditLogService {
   }
 
   async listPaginated(
-    opts: { organizationId?: string; page: number; pageSize: number },
+    opts: ListPaginatedOptions,
   ): Promise<{ items: AuditLogEntry[]; total: number }> {
     return this.repo.listPaginated(opts);
   }

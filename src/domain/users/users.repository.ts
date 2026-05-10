@@ -19,6 +19,7 @@ export interface UpdateUserInput {
   mustChangePassword?: boolean;
   passwordHash?: string;
   isActive?: boolean;
+  lastLoginAt?: Date;
 }
 
 export abstract class UsersRepository {

@@ -69,6 +69,7 @@ export class AuthService {
     }
 
     const session = await this.issueSession(matched);
+    await this.users.recordLogin(matched.id);
     await this.auditLog.record({
       organizationId: matched.organizationId,
       userId: matched.id,

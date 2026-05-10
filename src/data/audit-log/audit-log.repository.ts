@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AuditAction, Prisma } from '@prisma/client';
 import { AuditLogEntry, AuditLogInput } from '../../domain/audit-log/audit-log.domain';
-import { AuditLogRepository } from '../../domain/audit-log/audit-log.repository';
+import {
+  AuditLogRepository,
+  ListPaginatedOptions,
+} from '../../domain/audit-log/audit-log.repository';
 import { TxClient } from '../../domain/common/transaction';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditLogMapper } from './audit-log.mapper';
@@ -74,10 +77,22 @@ export class PrismaAuditLogRepository extends AuditLogRepository {
   }
 
   async listPaginated(
-    opts: { organizationId?: string; page: number; pageSize: number },
+    opts: ListPaginatedOptions,
     tx?: TxClient,
   ): Promise<{ items: AuditLogEntry[]; total: number }> {
-    const where = opts.organizationId ? { organizationId: opts.organizationId } : {};
+    const where: Prisma.AuditLogWhereInput = {};
+    if (opts.organizationId) where.organizationId = opts.organizationId;
+    if (opts.userId) where.userId = opts.userId;
+    if (opts.entityType) where.entityType = opts.entityType;
+    if (opts.actions && opts.actions.length > 0) {
+      where.action = { in: opts.actions as AuditAction[] };
+    }
+    if (opts.dateFrom || opts.dateTo) {
+      where.createdAt = {};
+      if (opts.dateFrom) where.createdAt.gte = opts.dateFrom;
+      if (opts.dateTo) where.createdAt.lt = opts.dateTo;
+    }
+
     const client = this.client(tx);
     const [rows, total] = await Promise.all([
       client.auditLog.findMany({

@@ -97,11 +97,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ? resp
           : (((resp as Record<string, unknown>)?.message as string | undefined) ??
             exception.message);
+      const customCode =
+        typeof resp === 'object' && resp !== null
+          ? ((resp as Record<string, unknown>).code as string | undefined)
+          : undefined;
 
       return {
         ...base,
         statusCode: status,
-        code: this.statusToCode(status),
+        code: customCode ?? this.statusToCode(status),
         message,
       };
     }

@@ -16,6 +16,7 @@ export class UsersMapper {
       p.isActive,
       p.createdAt,
       p.updatedAt,
+      p.lastLoginAt,
     );
   }
 }

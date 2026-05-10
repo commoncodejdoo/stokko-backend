@@ -83,6 +83,13 @@ enum AuditAction {
   USER_PASSWORD_RESET
   USER_PASSWORD_CHANGED
   USER_LOGGED_IN
+
+  // Platform-admin actions (A3/A4)
+  ADMIN_IMPERSONATED
+  ADMIN_USER_PASSWORD_RESET
+  ADMIN_USER_UPDATED
+  ADMIN_USER_DEACTIVATED
+  ADMIN_USER_REACTIVATED
 }
 
 // ───────────── PLATFORM ADMIN ─────────────
@@ -127,10 +134,11 @@ model User {
   role               Role
   firstName          String
   lastName           String
-  mustChangePassword Boolean  @default(true)
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  mustChangePassword Boolean   @default(true)
+  isActive           Boolean   @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   organization        Organization      @relation(fields: [organizationId], references: [id])
   refreshTokens       RefreshToken[]
