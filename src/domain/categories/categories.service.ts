@@ -23,6 +23,14 @@ export class CategoriesService {
     return this.repo.findById(id, tx);
   }
 
+  async findByName(
+    name: string,
+    organizationId: string,
+    tx?: TxClient,
+  ): Promise<Category | null> {
+    return this.repo.findByName(organizationId, name, tx);
+  }
+
   async requireById(id: string, organizationId: string, tx?: TxClient): Promise<Category> {
     const cat = await this.repo.findById(id, tx);
     if (!cat || cat.isDeleted()) throw new EntityNotFoundError('Category', id);

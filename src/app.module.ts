@@ -5,6 +5,7 @@ import { AdminModule } from './presentation/admin/admin.module';
 import { ArticlesModule } from './presentation/articles/articles.module';
 import { AuditLogModule } from './presentation/audit-log/audit-log.module';
 import { AuthModule } from './presentation/auth/auth.module';
+import { BulkImportModule } from './presentation/bulk-import/bulk-import.module';
 import { CategoriesModule } from './presentation/categories/categories.module';
 import { HealthModule } from './presentation/common/health/health.module';
 import { CorrectionsModule } from './presentation/corrections/corrections.module';
@@ -38,6 +39,7 @@ import { WarehousesModule } from './presentation/warehouses/warehouses.module';
     AuthModule,
     DashboardModule,
     AdminModule,
+    BulkImportModule,
   ],
 })
 export class AppModule {}

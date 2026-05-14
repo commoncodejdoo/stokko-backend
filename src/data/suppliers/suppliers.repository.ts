@@ -42,6 +42,21 @@ export class PrismaSuppliersRepository extends SuppliersRepository {
     return row ? this.mapper.toDomain(row) : null;
   }
 
+  async findByName(
+    organizationId: string,
+    name: string,
+    tx?: TxClient,
+  ): Promise<Supplier | null> {
+    const row = await this.client(tx).supplier.findFirst({
+      where: {
+        organizationId,
+        name: { equals: name.trim(), mode: 'insensitive' },
+        ...whereNotDeleted(),
+      },
+    });
+    return row ? this.mapper.toDomain(row) : null;
+  }
+
   async listByOrg(organizationId: string, tx?: TxClient): Promise<Supplier[]> {
     const rows = await this.client(tx).supplier.findMany({
       where: { organizationId, ...whereNotDeleted() },

@@ -39,6 +39,21 @@ export class PrismaCategoriesRepository extends CategoriesRepository {
     return row ? this.mapper.toDomain(row) : null;
   }
 
+  async findByName(
+    organizationId: string,
+    name: string,
+    tx?: TxClient,
+  ): Promise<Category | null> {
+    const row = await this.client(tx).category.findFirst({
+      where: {
+        organizationId,
+        name: { equals: name.trim(), mode: 'insensitive' },
+        ...whereNotDeleted(),
+      },
+    });
+    return row ? this.mapper.toDomain(row) : null;
+  }
+
   async listByOrg(organizationId: string, tx?: TxClient): Promise<Category[]> {
     const rows = await this.client(tx).category.findMany({
       where: { organizationId, ...whereNotDeleted() },

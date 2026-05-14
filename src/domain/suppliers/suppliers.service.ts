@@ -29,6 +29,14 @@ export class SuppliersService {
     return this.repo.findById(id, tx);
   }
 
+  async findByName(
+    name: string,
+    organizationId: string,
+    tx?: TxClient,
+  ): Promise<Supplier | null> {
+    return this.repo.findByName(organizationId, name, tx);
+  }
+
   async requireById(id: string, organizationId: string, tx?: TxClient): Promise<Supplier> {
     const s = await this.repo.findById(id, tx);
     if (!s || s.isDeleted()) throw new EntityNotFoundError('Supplier', id);

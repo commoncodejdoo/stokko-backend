@@ -25,6 +25,14 @@ export class WarehousesService {
     return this.repo.findById(id, tx);
   }
 
+  async findByName(
+    name: string,
+    organizationId: string,
+    tx?: TxClient,
+  ): Promise<Warehouse | null> {
+    return this.repo.findByName(organizationId, name, tx);
+  }
+
   async requireById(id: string, organizationId: string, tx?: TxClient): Promise<Warehouse> {
     const wh = await this.repo.findById(id, tx);
     if (!wh || wh.isDeleted()) throw new EntityNotFoundError('Warehouse', id);

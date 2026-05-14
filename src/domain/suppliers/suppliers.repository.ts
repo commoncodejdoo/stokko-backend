@@ -21,6 +21,11 @@ export interface UpdateSupplierInput {
 export abstract class SuppliersRepository {
   abstract create(input: CreateSupplierInput, tx?: TxClient): Promise<Supplier>;
   abstract findById(id: string, tx?: TxClient): Promise<Supplier | null>;
+  abstract findByName(
+    organizationId: string,
+    name: string,
+    tx?: TxClient,
+  ): Promise<Supplier | null>;
   abstract listByOrg(organizationId: string, tx?: TxClient): Promise<Supplier[]>;
   abstract update(id: string, patch: UpdateSupplierInput, tx?: TxClient): Promise<Supplier>;
   abstract softDelete(id: string, tx?: TxClient): Promise<Supplier>;

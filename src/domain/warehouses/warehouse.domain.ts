@@ -2,7 +2,8 @@ import { DomainValidationError } from '../common/errors';
 
 const HEX_RX = /^#[0-9a-fA-F]{6}$/;
 
-export type WarehouseKind = 'STORAGE' | 'FOH';
+export const WAREHOUSE_KINDS = ['STORAGE', 'FOH'] as const;
+export type WarehouseKind = (typeof WAREHOUSE_KINDS)[number];
 
 export class Warehouse {
   constructor(

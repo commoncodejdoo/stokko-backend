@@ -33,6 +33,21 @@ export class PrismaWarehousesRepository extends WarehousesRepository {
     return row ? this.mapper.toDomain(row) : null;
   }
 
+  async findByName(
+    organizationId: string,
+    name: string,
+    tx?: TxClient,
+  ): Promise<Warehouse | null> {
+    const row = await this.client(tx).warehouse.findFirst({
+      where: {
+        organizationId,
+        name: { equals: name.trim(), mode: 'insensitive' },
+        ...whereNotDeleted(),
+      },
+    });
+    return row ? this.mapper.toDomain(row) : null;
+  }
+
   async listByOrg(organizationId: string, tx?: TxClient): Promise<Warehouse[]> {
     const rows = await this.client(tx).warehouse.findMany({
       where: { organizationId, ...whereNotDeleted() },
