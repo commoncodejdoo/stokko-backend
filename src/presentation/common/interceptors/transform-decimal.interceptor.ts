@@ -1,4 +1,10 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import {
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  NestInterceptor,
+  StreamableFile,
+} from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { Observable, map } from 'rxjs';
 
@@ -28,6 +34,20 @@ export class TransformDecimalInterceptor implements NestInterceptor {
     }
 
     if (value instanceof Date) return value.toISOString();
+
+    // Don't walk into binary buffers / streams / StreamableFile — they
+    // should pass through to the response unchanged. Without this guard,
+    // `Object.entries(buf)` below would serialise the buffer byte-by-byte
+    // into JSON, or expose a StreamableFile's internal `options` blob.
+    if (Buffer.isBuffer(value)) return value;
+    if (value instanceof StreamableFile) return value;
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      (Symbol.asyncIterator in value || 'pipe' in value)
+    ) {
+      return value;
+    }
 
     if (Array.isArray(value)) return value.map((v) => this.transform(v));
 

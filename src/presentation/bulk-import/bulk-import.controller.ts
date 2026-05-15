@@ -4,13 +4,13 @@ import {
   Get,
   Header,
   Post,
-  Res,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
+import { Readable } from 'node:stream';
 import { BulkImportTemplateGenerator } from '../../domain/bulk-import/bulk-import-template.generator';
 import { BulkImportService } from '../../domain/bulk-import/bulk-import.service';
 import type { AuthContext } from '../../domain/common/auth-context';
@@ -45,14 +45,16 @@ export class BulkImportController {
   )
   @Header('Content-Disposition', 'attachment; filename="stokko-predlozak.xlsx"')
   @Header('Cache-Control', 'no-store')
-  async template(
-    @CurrentUser() ctx: AuthContext,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<Buffer> {
+  async template(@CurrentUser() ctx: AuthContext): Promise<StreamableFile> {
     const org = await this.orgs.requireById(ctx.organizationId);
     const buffer = await this.templateGenerator.build(org.currency);
-    res.setHeader('Content-Length', buffer.length);
-    return buffer;
+    // StreamableFile bypasses the global response pipeline (interceptors that
+    // walk JS objects byte-by-byte would otherwise serialise the Buffer to JSON).
+    return new StreamableFile(Readable.from(buffer), {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: 'attachment; filename="stokko-predlozak.xlsx"',
+      length: buffer.length,
+    });
   }
 
   @Post()
