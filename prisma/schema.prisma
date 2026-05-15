@@ -90,6 +90,34 @@ enum AuditAction {
   ADMIN_USER_UPDATED
   ADMIN_USER_DEACTIVATED
   ADMIN_USER_REACTIVATED
+
+  // AI Sloj 0 — predictions + shopping lists
+  RECOMMENDATION_GENERATED
+  SHOPPING_LIST_CREATED
+  SHOPPING_LIST_COMPLETED
+  SHOPPING_LIST_CANCELLED
+  SHOPPING_LIST_ITEM_ADDED
+  SHOPPING_LIST_ITEM_REMOVED
+  SHOPPING_LIST_ITEM_UPDATED
+}
+
+enum Urgency {
+  CRITICAL
+  WARNING
+  OK
+}
+
+enum ShoppingListStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum NarrativeKind {
+  DAILY_DIGEST
+  ITEM_EXPLANATION
+  ANOMALY
 }
 
 // ───────────── PLATFORM ADMIN ─────────────
@@ -105,29 +133,36 @@ model AdminUser {
 // ───────────── CORE ─────────────
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  currency  String   @default("EUR") // ISO 4217
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  name                String
+  currency            String   @default("EUR") // ISO 4217
+  isActive            Boolean  @default(true)
+  // AI Sloj 0 — per-org reorder defaults (overrideable per-supplier later)
+  defaultLeadTimeDays Int      @default(2)
+  defaultSafetyDays   Int      @default(1)
+  defaultCoverageDays Int      @default(7)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  users            User[]
-  refreshTokens    RefreshToken[]
-  auditLogs        AuditLog[]
-  categories       Category[]
-  warehouses       Warehouse[]
-  suppliers        Supplier[]
-  articles         Article[]
-  procurements     Procurement[]
-  stockCorrections StockCorrection[]
-  stockTransfers   StockTransfer[]
-  shifts           Shift[]
-  sales            Sale[]
+  users               User[]
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+  categories          Category[]
+  warehouses          Warehouse[]
+  suppliers           Supplier[]
+  articles            Article[]
+  procurements        Procurement[]
+  stockCorrections    StockCorrection[]
+  stockTransfers      StockTransfer[]
+  shifts              Shift[]
+  sales               Sale[]
+  predictionSnapshots PredictionSnapshot[]
+  shoppingLists       ShoppingList[]
+  narratives          RecommendationNarrative[]
 }
 
 model User {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   organizationId     String
   email              String
   passwordHash       String
@@ -140,15 +175,17 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  organization        Organization      @relation(fields: [organizationId], references: [id])
-  refreshTokens       RefreshToken[]
-  auditLogs           AuditLog[]
-  createdArticles     Article[]         @relation("ArticleCreatedBy")
-  createdProcurements Procurement[]
-  createdCorrections  StockCorrection[]
-  createdTransfers    StockTransfer[]
-  closedShifts        Shift[]
-  createdSales        Sale[]
+  organization           Organization      @relation(fields: [organizationId], references: [id])
+  refreshTokens          RefreshToken[]
+  auditLogs              AuditLog[]
+  createdArticles        Article[]         @relation("ArticleCreatedBy")
+  createdProcurements    Procurement[]
+  createdCorrections     StockCorrection[]
+  createdTransfers       StockTransfer[]
+  closedShifts           Shift[]
+  createdSales           Sale[]
+  createdShoppingLists   ShoppingList[]    @relation("ShoppingListCreatedBy")
+  completedShoppingLists ShoppingList[]    @relation("ShoppingListCompletedBy")
 
   @@unique([organizationId, email])
   @@index([email])
@@ -202,13 +239,16 @@ model Warehouse {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  organization     Organization      @relation(fields: [organizationId], references: [id])
-  stockEntries     StockEntry[]
-  procurements     Procurement[]
-  stockCorrections StockCorrection[]
-  transfersOut     StockTransfer[]   @relation("TransferSource")
-  transfersIn      StockTransfer[]   @relation("TransferDestination")
-  sales            Sale[]
+  organization        Organization              @relation(fields: [organizationId], references: [id])
+  stockEntries        StockEntry[]
+  procurements        Procurement[]
+  stockCorrections    StockCorrection[]
+  transfersOut        StockTransfer[]           @relation("TransferSource")
+  transfersIn         StockTransfer[]           @relation("TransferDestination")
+  sales               Sale[]
+  predictionSnapshots PredictionSnapshot[]
+  shoppingListItems   ShoppingListItem[]
+  narratives          RecommendationNarrative[]
 
   @@unique([organizationId, name])
   @@index([organizationId, deletedAt])
@@ -226,9 +266,10 @@ model Supplier {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  articles     Article[]
-  procurements Procurement[]
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  articles          Article[]
+  procurements      Procurement[]
+  shoppingListItems ShoppingListItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId, deletedAt])
@@ -251,15 +292,18 @@ model Article {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  organization       Organization        @relation(fields: [organizationId], references: [id])
-  category           Category            @relation(fields: [categoryId], references: [id])
-  supplier           Supplier?           @relation(fields: [supplierId], references: [id])
-  createdBy          User                @relation("ArticleCreatedBy", fields: [createdById], references: [id])
-  stockEntries       StockEntry[]
-  procurementItems   ProcurementItem[]
-  stockCorrections   StockCorrection[]
-  stockTransferItems StockTransferItem[]
-  saleItems          SaleItem[]
+  organization        Organization              @relation(fields: [organizationId], references: [id])
+  category            Category                  @relation(fields: [categoryId], references: [id])
+  supplier            Supplier?                 @relation(fields: [supplierId], references: [id])
+  createdBy           User                      @relation("ArticleCreatedBy", fields: [createdById], references: [id])
+  stockEntries        StockEntry[]
+  procurementItems    ProcurementItem[]
+  stockCorrections    StockCorrection[]
+  stockTransferItems  StockTransferItem[]
+  saleItems           SaleItem[]
+  predictionSnapshots PredictionSnapshot[]
+  shoppingListItems   ShoppingListItem[]
+  narratives          RecommendationNarrative[]
 
   @@unique([organizationId, sku])
   @@unique([organizationId, name])
@@ -425,6 +469,109 @@ model SaleItem {
 
   @@index([saleId])
   @@index([articleId])
+}
+
+// ───────────── AI SLOJ 0 — predictions + shopping lists + narratives ─────────────
+
+// Latest computed recommendation per (org, warehouse, article) tuple.
+// Newest snapshot accessed by ordering computedAt DESC; older rows preserved
+// for trend analysis. Daily cron rewrites the row set; UI reads the latest.
+model PredictionSnapshot {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  warehouseId         String
+  articleId           String
+  currentStock        Decimal  @db.Decimal(12, 3)
+  avgDailyConsumption Decimal? @db.Decimal(12, 3)
+  daysOfSupply        Decimal? @db.Decimal(12, 2)
+  shouldReorder       Boolean  @default(false)
+  suggestedQty        Decimal  @default(0) @db.Decimal(12, 3)
+  urgency             Urgency  @default(OK)
+  leadTimeDaysUsed    Int
+  safetyDaysUsed      Int
+  coverageDaysUsed    Int
+  signalWindowDays    Int
+  computedAt          DateTime @default(now())
+  validUntil          DateTime
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  article      Article      @relation(fields: [articleId], references: [id])
+
+  @@index([organizationId, warehouseId, articleId, computedAt(sort: Desc)])
+  @@index([organizationId, urgency, computedAt(sort: Desc)])
+}
+
+// One shopping list per org is "active" (DRAFT or ACTIVE) at a time;
+// guard is application-level in ShoppingListsService.requireNoActive().
+model ShoppingList {
+  id                      String             @id @default(cuid())
+  organizationId          String
+  status                  ShoppingListStatus @default(DRAFT)
+  createdById             String
+  completedById           String?
+  completedAt             DateTime?
+  totalEstimateCents      Int                @default(0)
+  currency                String             @default("EUR")
+  generatedFromSnapshotAt DateTime?
+  note                    String?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  createdBy    User               @relation("ShoppingListCreatedBy", fields: [createdById], references: [id])
+  completedBy  User?              @relation("ShoppingListCompletedBy", fields: [completedById], references: [id])
+  items        ShoppingListItem[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+model ShoppingListItem {
+  id                  String   @id @default(cuid())
+  shoppingListId      String
+  articleId           String
+  warehouseId         String
+  suggestedQty        Decimal  @db.Decimal(12, 3)
+  customQty           Decimal? @db.Decimal(12, 3)
+  supplierId          String?
+  isChecked           Boolean  @default(false)
+  addedManually       Boolean  @default(false)
+  sortOrder           Int      @default(0)
+  estimatedPriceCents Int      @default(0)
+
+  shoppingList ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  article      Article      @relation(fields: [articleId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  supplier     Supplier?    @relation(fields: [supplierId], references: [id])
+
+  @@unique([shoppingListId, articleId, warehouseId])
+  @@index([shoppingListId, sortOrder])
+}
+
+// Persisted LLM output — both daily digests (one per org per day) and
+// per-article explanations (TTL cached, see narratives.service).
+model RecommendationNarrative {
+  id             String        @id @default(cuid())
+  organizationId String
+  kind           NarrativeKind
+  body           String
+  articleId      String?
+  warehouseId    String?
+  modelUsed      String
+  tokensIn       Int           @default(0)
+  tokensOut      Int           @default(0)
+  cachedTokens   Int           @default(0)
+  costUsd        Decimal       @db.Decimal(10, 6)
+  validForDate   DateTime?     @db.Date
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  article      Article?     @relation(fields: [articleId], references: [id])
+  warehouse    Warehouse?   @relation(fields: [warehouseId], references: [id])
+
+  @@index([organizationId, kind, validForDate(sort: Desc)])
+  @@index([organizationId, articleId, warehouseId, createdAt(sort: Desc)])
 }
 
 // ───────────── AUDIT ─────────────

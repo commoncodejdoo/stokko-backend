@@ -13,6 +13,12 @@ export class Organization {
     readonly name: string,
     readonly currency: string,
     readonly isActive: boolean,
+    /** Default supplier lead time in days — used by predictions rules engine. */
+    readonly defaultLeadTimeDays: number,
+    /** Safety stock buffer in days. */
+    readonly defaultSafetyDays: number,
+    /** Coverage target in days when computing suggestedQty. */
+    readonly defaultCoverageDays: number,
     readonly createdAt: Date,
     readonly updatedAt: Date,
   ) {
@@ -25,6 +31,9 @@ export class Organization {
         { currency },
       );
     }
+    if (defaultLeadTimeDays < 0 || defaultSafetyDays < 0 || defaultCoverageDays < 0) {
+      throw new DomainValidationError('Reorder defaults cannot be negative');
+    }
   }
 
   toSnapshot(): Record<string, unknown> {
@@ -33,6 +42,9 @@ export class Organization {
       name: this.name,
       currency: this.currency,
       isActive: this.isActive,
+      defaultLeadTimeDays: this.defaultLeadTimeDays,
+      defaultSafetyDays: this.defaultSafetyDays,
+      defaultCoverageDays: this.defaultCoverageDays,
       createdAt: this.createdAt.toISOString(),
       updatedAt: this.updatedAt.toISOString(),
     };

@@ -1,0 +1,44 @@
+name: Predictions cron
+
+on:
+  schedule:
+    # 03:00 UTC — recompute reorder snapshots for every active org.
+    - cron: '0 3 * * *'
+    # 04:00 UTC — generate per-org daily digest narratives (depends on snapshots).
+    - cron: '0 4 * * *'
+  # Manual trigger for testing / one-off recompute.
+  workflow_dispatch: {}
+
+jobs:
+  recompute-predictions:
+    if: github.event.schedule == '0 3 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recompute predictions for all orgs
+        env:
+          URL: ${{ secrets.STOKKO_API_URL }}
+          SECRET: ${{ secrets.PREDICTIONS_CRON_SECRET }}
+        run: |
+          curl -fsS \
+            -X POST "$URL/predictions/internal/recompute-all" \
+            -H "X-Cron-Secret: $SECRET" \
+            --max-time 300 \
+            --retry 2 \
+            --retry-delay 30
+
+  generate-digests:
+    if: github.event.schedule == '0 4 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs: recompute-predictions
+    steps:
+      - name: Generate daily digests for all orgs
+        env:
+          URL: ${{ secrets.STOKKO_API_URL }}
+          SECRET: ${{ secrets.PREDICTIONS_CRON_SECRET }}
+        run: |
+          curl -fsS \
+            -X POST "$URL/narratives/internal/generate-digests" \
+            -H "X-Cron-Secret: $SECRET" \
+            --max-time 300 \
+            --retry 2 \
+            --retry-delay 30
