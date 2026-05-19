@@ -11,7 +11,6 @@ interface RawJwtPayload {
   organizationId: string;
   role: Role;
   type?: string;
-  readOnly?: boolean;
   impersonatedBy?: string;
   iat: number;
   exp: number;
@@ -41,7 +40,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       userId: payload.userId,
       organizationId: payload.organizationId,
       role: payload.role,
-      readOnly: payload.readOnly === true ? true : undefined,
       impersonatedBy: payload.impersonatedBy,
     };
   }

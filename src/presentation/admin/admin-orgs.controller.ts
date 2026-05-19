@@ -129,7 +129,6 @@ export class AdminOrgsController {
     return {
       accessToken: session.accessToken,
       expiresAt: session.expiresAt.toISOString(),
-      readOnly: true,
       user: session.user.toPublic(),
       organization: session.organization.toSnapshot(),
     };

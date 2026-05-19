@@ -38,7 +38,6 @@ export class NestJwtTokenService extends JwtTokenService {
         organizationId: claims.organizationId,
         role: claims.role,
         type: 'access',
-        ...(claims.readOnly ? { readOnly: true } : {}),
         ...(claims.impersonatedBy ? { impersonatedBy: claims.impersonatedBy } : {}),
       },
       { secret: this.secret, expiresIn: this.accessTtl },
@@ -48,7 +47,7 @@ export class NestJwtTokenService extends JwtTokenService {
   async issueImpersonationToken(
     claims: ImpersonationTokenClaims,
   ): Promise<{ accessToken: string; expiresAt: Date }> {
-    const ttlSeconds = claims.ttlSeconds ?? 15 * 60;
+    const ttlSeconds = claims.ttlSeconds ?? 60 * 60;
     const accessToken = await this.jwt.signAsync(
       {
         sub: claims.userId,
@@ -56,7 +55,6 @@ export class NestJwtTokenService extends JwtTokenService {
         organizationId: claims.organizationId,
         role: claims.role,
         type: 'access',
-        readOnly: true,
         impersonatedBy: claims.adminId,
       },
       { secret: this.secret, expiresIn: ttlSeconds },

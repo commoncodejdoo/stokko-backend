@@ -2,7 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './presentation/common/filters/global-exception.filter';
-import { ReadOnlySessionInterceptor } from './presentation/common/interceptors/read-only-session.interceptor';
+import { RequestContextInterceptor } from './presentation/common/interceptors/request-context.interceptor';
 import { TransformDecimalInterceptor } from './presentation/common/interceptors/transform-decimal.interceptor';
 
 async function bootstrap(): Promise<void> {
@@ -33,7 +33,7 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(
-    new ReadOnlySessionInterceptor(),
+    new RequestContextInterceptor(),
     new TransformDecimalInterceptor(),
   );
 

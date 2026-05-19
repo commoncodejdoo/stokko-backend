@@ -4,8 +4,6 @@ export interface AccessTokenClaims {
   userId: string;
   organizationId: string;
   role: Role;
-  /** Set by platform-admin impersonation flow (A3). */
-  readOnly?: boolean;
   /** Admin id that opened the impersonation session. */
   impersonatedBy?: string;
 }
@@ -21,7 +19,7 @@ export interface ImpersonationTokenClaims {
   organizationId: string;
   role: Role;
   adminId: string;
-  /** TTL in seconds (default 15 min). */
+  /** TTL in seconds (default 1 hour). */
   ttlSeconds?: number;
 }
 
@@ -65,10 +63,10 @@ export abstract class JwtTokenService {
   abstract verifyAdminToken(token: string): Promise<AdminTokenPayload>;
 
   /**
-   * Issues a short-lived access token that carries `readOnly: true` and
-   * `impersonatedBy: <adminId>`. The token verifies as a normal access
-   * token in `JwtStrategy`, but `ReadOnlySessionInterceptor` blocks every
-   * non-GET request.
+   * Issues a short-lived access token that carries `impersonatedBy: <adminId>`.
+   * Verifies as a normal access token; the `RequestContextInterceptor`
+   * mirrors `impersonatedBy` into AsyncLocalStorage so `AuditLogService`
+   * can suppress audit entries for the duration of the session.
    */
   abstract issueImpersonationToken(claims: ImpersonationTokenClaims): Promise<{
     accessToken: string;

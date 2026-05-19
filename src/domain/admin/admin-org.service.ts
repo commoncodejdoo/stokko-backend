@@ -235,11 +235,13 @@ export class AdminOrgService {
   }
 
   /**
-   * Issues a short-lived read-only access token for "View as Owner".
-   * Picks the oldest active OWNER of the target org as the impersonated
-   * principal. Records an `ADMIN_IMPERSONATED` audit entry against that
-   * OWNER (the only user-shaped actor we have until A6 introduces an
-   * `AdminAuditLog` table).
+   * Issues a 1-hour access token for "View as Owner". Picks the oldest
+   * active OWNER of the target org as the impersonated principal and
+   * records an `ADMIN_IMPERSONATED` audit entry against that OWNER. The
+   * session token carries `impersonatedBy: <adminId>` which causes
+   * `AuditLogService.record()` to suppress any further audit entries for
+   * actions performed during the session (until A6 introduces an
+   * `AdminAuditLog` table that captures admin activity separately).
    */
   async createImpersonationSession(
     orgId: string,

@@ -12,11 +12,9 @@ export interface AuthContext {
   organizationId: string;
   role: Role;
   /**
-   * Read-only impersonation flag — set when a platform admin opened this
-   * org via "View as Owner". `ReadOnlySessionInterceptor` blocks every
-   * non-GET request. Domain code may read it for defence-in-depth.
+   * Admin id that initiated the impersonation session. Mirrored into
+   * AsyncLocalStorage by `RequestContextInterceptor` so write-side services
+   * can suppress audit-log entries while the admin operates as Owner.
    */
-  readOnly?: boolean;
-  /** Admin id that initiated the impersonation session (audit trail). */
   impersonatedBy?: string;
 }

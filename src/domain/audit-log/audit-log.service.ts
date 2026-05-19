@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { getRequestContext } from '../common/request-context';
 import { TxClient } from '../common/transaction';
 import { AuditLogEntry, AuditLogInput } from './audit-log.domain';
 import { AuditLogRepository, ListPaginatedOptions } from './audit-log.repository';
@@ -16,6 +17,10 @@ export class AuditLogService {
   constructor(private readonly repo: AuditLogRepository) {}
 
   async record(input: AuditLogInput, tx?: TxClient): Promise<void> {
+    // Suppress audit entries for actions performed inside a platform-admin
+    // impersonation session — they are tracked separately via the
+    // `ADMIN_IMPERSONATED` entry written when the session is opened.
+    if (getRequestContext()?.impersonatedBy) return;
     await this.repo.create(input, tx);
   }
 
