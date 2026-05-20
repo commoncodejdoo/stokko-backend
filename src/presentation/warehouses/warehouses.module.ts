@@ -6,6 +6,7 @@ import { ArticlesModule } from '../articles/articles.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { StockModule } from '../stock/stock.module';
+import { UserWarehouseAccessModule } from '../user-warehouse-access/user-warehouse-access.module';
 import { WarehousesController } from './warehouses.controller';
 
 @Module({
@@ -16,6 +17,7 @@ import { WarehousesController } from './warehouses.controller';
     // ArticlesModule already depends on WarehousesModule (for stock seeding
     // on article create); use forwardRef to break the circular import.
     forwardRef(() => ArticlesModule),
+    forwardRef(() => UserWarehouseAccessModule),
   ],
   controllers: [WarehousesController],
   providers: [

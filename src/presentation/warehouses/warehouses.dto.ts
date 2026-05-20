@@ -1,4 +1,13 @@
-import { IsEnum, IsHexColor, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsEnum,
+  IsHexColor,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export enum WarehouseKindDto {
   STORAGE = 'STORAGE',
@@ -33,4 +42,11 @@ export class UpdateWarehouseDto {
   @IsOptional()
   @IsEnum(WarehouseKindDto)
   kind?: WarehouseKindDto;
+}
+
+export class ReplaceWarehouseUsersDto {
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  userIds!: string[];
 }

@@ -7,17 +7,23 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import type { AuthContext } from '../../domain/common/auth-context';
 import { DomainValidationError } from '../../domain/common/errors';
 import { Role } from '../../domain/common/role';
+import { UserWarehouseAccessService } from '../../domain/user-warehouse-access/user-warehouse-access.service';
 import { UsersService } from '../../domain/users/users.service';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../common/auth/jwt-auth.guard';
 import { Roles } from '../common/auth/roles.decorator';
 import { RolesGuard } from '../common/auth/roles.guard';
-import { InviteUserDto, UpdateUserDto } from './users.dto';
+import {
+  InviteUserDto,
+  ReplaceUserWarehousesDto,
+  UpdateUserDto,
+} from './users.dto';
 
 /**
  * Owner-facing user management. The `/me` endpoint lives in
@@ -29,7 +35,10 @@ import { InviteUserDto, UpdateUserDto } from './users.dto';
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersManagementController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly warehouseAccess: UserWarehouseAccessService,
+  ) {}
 
   @Get()
   async list(@CurrentUser() ctx: AuthContext) {
@@ -121,5 +130,23 @@ export class UsersManagementController {
       user: user.toPublic(),
       temporaryPassword,
     };
+  }
+
+  @Get(':id/warehouses')
+  @Roles(Role.OWNER, Role.ADMIN)
+  async listWarehouses(@Param('id') id: string, @CurrentUser() ctx: AuthContext) {
+    const rows = await this.warehouseAccess.listForUser(id, ctx.organizationId);
+    return { warehouseIds: rows.map((r) => r.warehouseId) };
+  }
+
+  @Put(':id/warehouses')
+  @Roles(Role.OWNER, Role.ADMIN)
+  async replaceWarehouses(
+    @Param('id') id: string,
+    @Body() body: ReplaceUserWarehousesDto,
+    @CurrentUser() ctx: AuthContext,
+  ) {
+    const rows = await this.warehouseAccess.replaceForUser(id, body.warehouseIds, ctx);
+    return { warehouseIds: rows.map((r) => r.warehouseId) };
   }
 }

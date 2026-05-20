@@ -10,12 +10,15 @@ import {
 import type { AuthContext } from '../../domain/common/auth-context';
 import { Procurement } from '../../domain/procurements/procurement.domain';
 import { ProcurementsService } from '../../domain/procurements/procurements.service';
+import { Role } from '../../domain/common/role';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../common/auth/jwt-auth.guard';
+import { Roles } from '../common/auth/roles.decorator';
+import { RolesGuard } from '../common/auth/roles.guard';
 import { CreateProcurementDto, ListProcurementsQueryDto } from './procurements.dto';
 
 @Controller('procurements')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ProcurementsController {
   constructor(private readonly service: ProcurementsService) {}
 
@@ -45,6 +48,7 @@ export class ProcurementsController {
   }
 
   @Post()
+  @Roles(Role.OWNER, Role.ADMIN)
   async create(@Body() body: CreateProcurementDto, @CurrentUser() ctx: AuthContext) {
     const p = await this.service.create(body, ctx);
     return this.toPublic(p);

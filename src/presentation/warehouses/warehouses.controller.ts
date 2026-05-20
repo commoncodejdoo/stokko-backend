@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
@@ -16,13 +17,18 @@ import { Role } from '../../domain/common/role';
 import { computeStockStatus } from '../../domain/common/stock-status';
 import { OrganizationsService } from '../../domain/organizations/organizations.service';
 import { StockService } from '../../domain/stock/stock.service';
+import { UserWarehouseAccessService } from '../../domain/user-warehouse-access/user-warehouse-access.service';
 import { Warehouse } from '../../domain/warehouses/warehouse.domain';
 import { WarehousesService } from '../../domain/warehouses/warehouses.service';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../common/auth/jwt-auth.guard';
 import { Roles } from '../common/auth/roles.decorator';
 import { RolesGuard } from '../common/auth/roles.guard';
-import { CreateWarehouseDto, UpdateWarehouseDto } from './warehouses.dto';
+import {
+  CreateWarehouseDto,
+  ReplaceWarehouseUsersDto,
+  UpdateWarehouseDto,
+} from './warehouses.dto';
 
 @Controller('warehouses')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -32,17 +38,25 @@ export class WarehousesController {
     private readonly articles: ArticlesService,
     private readonly stock: StockService,
     private readonly orgs: OrganizationsService,
+    private readonly access: UserWarehouseAccessService,
   ) {}
 
   @Get()
   async list(@CurrentUser() ctx: AuthContext) {
     const items = await this.service.list(ctx.organizationId);
+    // EMPLOYEE only sees warehouses they have explicit access to. OWNER and
+    // ADMIN see everything.
+    if (ctx.role === Role.EMPLOYEE) {
+      const allowed = new Set(await this.access.allowedWarehouseIdsForCtx(ctx));
+      return { items: items.filter((w) => allowed.has(w.id)).map((w) => this.toPublic(w)) };
+    }
     return { items: items.map((w) => this.toPublic(w)) };
   }
 
   @Get(':id')
   async detail(@Param('id') id: string, @CurrentUser() ctx: AuthContext) {
     const wh = await this.service.requireById(id, ctx.organizationId);
+    await this.access.requireAccessForCtx(ctx, wh.id);
     return this.toPublic(wh);
   }
 
@@ -79,6 +93,7 @@ export class WarehousesController {
   @Get(':id/articles')
   async listArticles(@Param('id') id: string, @CurrentUser() ctx: AuthContext) {
     await this.service.requireById(id, ctx.organizationId);
+    await this.access.requireAccessForCtx(ctx, id);
 
     const [stockEntries, allArticles] = await Promise.all([
       this.stock.getByWarehouse(id),
@@ -143,6 +158,24 @@ export class WarehousesController {
         currency: org.currency,
       },
     };
+  }
+
+  @Get(':id/users')
+  @Roles(Role.OWNER, Role.ADMIN)
+  async listUsers(@Param('id') id: string, @CurrentUser() ctx: AuthContext) {
+    const rows = await this.access.listForWarehouse(id, ctx.organizationId);
+    return { userIds: rows.map((r) => r.userId) };
+  }
+
+  @Put(':id/users')
+  @Roles(Role.OWNER, Role.ADMIN)
+  async replaceUsers(
+    @Param('id') id: string,
+    @Body() body: ReplaceWarehouseUsersDto,
+    @CurrentUser() ctx: AuthContext,
+  ) {
+    const rows = await this.access.replaceForWarehouse(id, body.userIds, ctx);
+    return { userIds: rows.map((r) => r.userId) };
   }
 
   private toPublic(wh: Warehouse) {

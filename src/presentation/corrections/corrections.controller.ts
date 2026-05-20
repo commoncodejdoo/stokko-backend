@@ -10,15 +10,18 @@ import {
 import type { AuthContext } from '../../domain/common/auth-context';
 import { StockCorrection } from '../../domain/corrections/correction.domain';
 import { CorrectionsService } from '../../domain/corrections/corrections.service';
+import { Role } from '../../domain/common/role';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../common/auth/jwt-auth.guard';
+import { Roles } from '../common/auth/roles.decorator';
+import { RolesGuard } from '../common/auth/roles.guard';
 import {
   CreateCorrectionDto,
   ListCorrectionsQueryDto,
 } from './corrections.dto';
 
 @Controller('stock/corrections')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class CorrectionsController {
   constructor(private readonly service: CorrectionsService) {}
 
@@ -49,6 +52,7 @@ export class CorrectionsController {
   }
 
   @Post()
+  @Roles(Role.OWNER, Role.ADMIN)
   async create(
     @Body() body: CreateCorrectionDto,
     @CurrentUser() ctx: AuthContext,

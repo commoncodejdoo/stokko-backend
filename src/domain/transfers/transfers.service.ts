@@ -51,10 +51,14 @@ export class TransfersService {
    *   4. Increment stock at destination.
    *   5. Insert StockTransfer + StockTransferItem rows.
    *   6. Record audit log.
+   *
+   * When `tx` is provided, runs in the caller's transaction (used by
+   * shift-close auto-replenish). Otherwise wraps in a new transaction.
    */
   async create(
     cmd: CreateTransferCommand,
     ctx: AuthContext,
+    tx?: TxClient,
   ): Promise<StockTransfer> {
     if (!cmd.items?.length) {
       throw new DomainValidationError('At least one item is required');
@@ -65,73 +69,80 @@ export class TransfersService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      await this.warehouses.requireById(
-        cmd.sourceWarehouseId,
-        ctx.organizationId,
-        tx,
-      );
-      await this.warehouses.requireById(
-        cmd.destinationWarehouseId,
-        ctx.organizationId,
-        tx,
-      );
-      for (const item of cmd.items) {
-        await this.articles.requireById(item.articleId, ctx.organizationId, tx);
-      }
+    if (tx) return this.createInTx(cmd, ctx, tx);
+    return this.prisma.$transaction((innerTx) => this.createInTx(cmd, ctx, innerTx));
+  }
 
-      // Aggregate same article entries (defensive — UI shouldn't allow it)
-      const aggregated = new Map<string, Decimal>();
-      for (const it of cmd.items) {
-        const qty = new Decimal(it.quantity as string | number);
-        if (qty.isNegative() || qty.isZero()) {
-          throw new DomainValidationError(
-            'Transfer item quantity must be > 0',
-            { articleId: it.articleId, quantity: qty.toFixed() },
-          );
-        }
-        aggregated.set(
-          it.articleId,
-          (aggregated.get(it.articleId) ?? new Decimal(0)).plus(qty),
+  private async createInTx(
+    cmd: CreateTransferCommand,
+    ctx: AuthContext,
+    tx: TxClient,
+  ): Promise<StockTransfer> {
+    await this.warehouses.requireById(
+      cmd.sourceWarehouseId,
+      ctx.organizationId,
+      tx,
+    );
+    await this.warehouses.requireById(
+      cmd.destinationWarehouseId,
+      ctx.organizationId,
+      tx,
+    );
+    for (const item of cmd.items) {
+      await this.articles.requireById(item.articleId, ctx.organizationId, tx);
+    }
+
+    // Aggregate same article entries (defensive — UI shouldn't allow it)
+    const aggregated = new Map<string, Decimal>();
+    for (const it of cmd.items) {
+      const qty = new Decimal(it.quantity as string | number);
+      if (qty.isNegative() || qty.isZero()) {
+        throw new DomainValidationError(
+          'Transfer item quantity must be > 0',
+          { articleId: it.articleId, quantity: qty.toFixed() },
         );
       }
-
-      // Move stock — source decrement first so it fails fast on insufficient stock.
-      for (const [articleId, qty] of aggregated.entries()) {
-        await this.stock.increment(articleId, cmd.sourceWarehouseId, qty.negated(), tx);
-        await this.stock.increment(articleId, cmd.destinationWarehouseId, qty, tx);
-      }
-
-      const created = await this.repo.create(
-        {
-          organizationId: ctx.organizationId,
-          sourceWarehouseId: cmd.sourceWarehouseId,
-          destinationWarehouseId: cmd.destinationWarehouseId,
-          createdById: ctx.userId,
-          note: cmd.note ?? null,
-          items: Array.from(aggregated.entries()).map(([articleId, quantity]) => ({
-            articleId,
-            quantity,
-          })),
-        },
-        tx,
+      aggregated.set(
+        it.articleId,
+        (aggregated.get(it.articleId) ?? new Decimal(0)).plus(qty),
       );
+    }
 
-      await this.auditLog.record(
-        {
-          organizationId: ctx.organizationId,
-          userId: ctx.userId,
-          action: AuditAction.TRANSFER_CREATED,
-          entityType: 'StockTransfer',
-          entityId: created.id,
-          before: null,
-          after: created.toSnapshot(),
-        },
-        tx,
-      );
+    // Move stock — source decrement first so it fails fast on insufficient stock.
+    for (const [articleId, qty] of aggregated.entries()) {
+      await this.stock.increment(articleId, cmd.sourceWarehouseId, qty.negated(), tx);
+      await this.stock.increment(articleId, cmd.destinationWarehouseId, qty, tx);
+    }
 
-      return created;
-    });
+    const created = await this.repo.create(
+      {
+        organizationId: ctx.organizationId,
+        sourceWarehouseId: cmd.sourceWarehouseId,
+        destinationWarehouseId: cmd.destinationWarehouseId,
+        createdById: ctx.userId,
+        note: cmd.note ?? null,
+        items: Array.from(aggregated.entries()).map(([articleId, quantity]) => ({
+          articleId,
+          quantity,
+        })),
+      },
+      tx,
+    );
+
+    await this.auditLog.record(
+      {
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        action: AuditAction.TRANSFER_CREATED,
+        entityType: 'StockTransfer',
+        entityId: created.id,
+        before: null,
+        after: created.toSnapshot(),
+      },
+      tx,
+    );
+
+    return created;
   }
 
   async findById(

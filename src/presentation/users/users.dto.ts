@@ -1,4 +1,6 @@
 import {
+  ArrayUnique,
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -30,4 +32,11 @@ export class UpdateUserDto {
   @IsOptional() @IsString() @MaxLength(60) firstName?: string;
   @IsOptional() @IsString() @MaxLength(60) lastName?: string;
   @IsOptional() @IsEnum(Role) role?: Role;
+}
+
+export class ReplaceUserWarehousesDto {
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  warehouseIds!: string[];
 }

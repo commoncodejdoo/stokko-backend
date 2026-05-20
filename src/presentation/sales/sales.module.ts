@@ -7,7 +7,9 @@ import { ArticlesModule } from '../articles/articles.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { StockModule } from '../stock/stock.module';
+import { TransfersModule } from '../transfers/transfers.module';
 import { WarehousesModule } from '../warehouses/warehouses.module';
+import { WarehouseStockTargetsModule } from '../warehouse-stock-targets/warehouse-stock-targets.module';
 import { SalesReportController } from './sales-report.controller';
 import { ShiftsController } from './shifts.controller';
 
@@ -18,6 +20,8 @@ import { ShiftsController } from './shifts.controller';
     ArticlesModule,
     StockModule,
     AuditLogModule,
+    TransfersModule,
+    WarehouseStockTargetsModule,
   ],
   controllers: [ShiftsController, SalesReportController],
   providers: [

@@ -58,6 +58,17 @@ export class ShiftsController {
     };
   }
 
+  /**
+   * Dry-run replenish preview for the shift-close confirm modal. Caller
+   * sends the same payload they'll submit to `/shifts/close`; this returns
+   * per-FOH deltas and source availability without writing anything.
+   */
+  @Post('close/preview')
+  @HttpCode(200)
+  async closePreview(@Body() body: CloseShiftDto, @CurrentUser() ctx: AuthContext) {
+    return this.service.previewShiftReplenish(body, ctx);
+  }
+
   @Delete(':id')
   @Roles(Role.OWNER, Role.ADMIN)
   @HttpCode(204)

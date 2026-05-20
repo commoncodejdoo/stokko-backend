@@ -10,12 +10,15 @@ import {
 import type { AuthContext } from '../../domain/common/auth-context';
 import { StockTransfer } from '../../domain/transfers/stock-transfer.domain';
 import { TransfersService } from '../../domain/transfers/transfers.service';
+import { Role } from '../../domain/common/role';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../common/auth/jwt-auth.guard';
+import { Roles } from '../common/auth/roles.decorator';
+import { RolesGuard } from '../common/auth/roles.guard';
 import { CreateTransferDto, ListTransfersQueryDto } from './transfers.dto';
 
 @Controller('stock/transfers')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TransfersController {
   constructor(private readonly service: TransfersService) {}
 
@@ -45,6 +48,7 @@ export class TransfersController {
   }
 
   @Post()
+  @Roles(Role.OWNER, Role.ADMIN)
   async create(
     @Body() body: CreateTransferDto,
     @CurrentUser() ctx: AuthContext,

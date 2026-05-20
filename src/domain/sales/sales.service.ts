@@ -12,7 +12,9 @@ import {
 import { TxClient } from '../common/transaction';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { StockService } from '../stock/stock.service';
+import { TransfersService } from '../transfers/transfers.service';
 import { WarehousesService } from '../warehouses/warehouses.service';
+import { WarehouseStockTargetsService } from '../warehouse-stock-targets/warehouse-stock-targets.service';
 import { PrismaService } from '../../data/common/prisma/prisma.service';
 import { Sale } from './sale.domain';
 import {
@@ -29,8 +31,45 @@ export interface CloseShiftItemCommand {
   quantity: string | number | Decimal;
 }
 
+export interface ReplenishOverrideCommand {
+  warehouseId: string;
+  articleId: string;
+  targetQty: string | number | Decimal;
+}
+
+export interface ReplenishCommand {
+  sourceWarehouseId: string;
+  overrides?: ReplenishOverrideCommand[];
+  skipWarehouseIds?: string[];
+}
+
 export interface CloseShiftCommand {
   items: CloseShiftItemCommand[];
+  replenish?: ReplenishCommand;
+}
+
+export type ReplenishItemStatus = 'ok' | 'partial' | 'insufficient' | 'no_target';
+
+export interface ReplenishItemPreview {
+  articleId: string;
+  currentStock: string;
+  projectedStock: string;
+  targetQty: string | null;
+  delta: string;
+  availableInSource: string;
+  willTransferQty: string;
+  status: ReplenishItemStatus;
+  overridden: boolean;
+}
+
+export interface ReplenishWarehousePreview {
+  warehouseId: string;
+  items: ReplenishItemPreview[];
+}
+
+export interface ReplenishPreview {
+  sourceWarehouseId: string;
+  warehouses: ReplenishWarehousePreview[];
 }
 
 @Injectable()
@@ -41,6 +80,8 @@ export class SalesService {
     private readonly warehouses: WarehousesService,
     private readonly articles: ArticlesService,
     private readonly stock: StockService,
+    private readonly stockTargets: WarehouseStockTargetsService,
+    private readonly transfers: TransfersService,
     private readonly auditLog: AuditLogService,
     private readonly prisma: PrismaService,
   ) {}
@@ -180,8 +221,231 @@ export class SalesService {
         tx,
       );
 
+      // Phase 9 — auto-replenish FOH from BOH after the shift is closed.
+      // Runs inside the same transaction so an insufficient-source error
+      // rolls back the entire shift close. Frontend should pre-validate
+      // with /shifts/close/preview and surface options to the user.
+      if (cmd.replenish) {
+        await this.executeReplenish(
+          cmd.replenish,
+          Array.from(buckets.values()).map((b) => b.warehouseId),
+          ctx,
+          tx,
+        );
+      }
+
       return { shift, sales };
     });
+  }
+
+  /**
+   * Dry-run replenish: returns per-FOH delta (target − projectedStock) and
+   * the amount available in the user-selected BOH source. No writes.
+   *
+   * Frontend calls this before actually closing the shift so the confirm
+   * modal can show "BOH ima 24, treba 28, prebacit ćemo djelomično".
+   */
+  async previewShiftReplenish(
+    cmd: CloseShiftCommand,
+    ctx: AuthContext,
+  ): Promise<ReplenishPreview> {
+    if (!cmd.replenish) {
+      throw new DomainValidationError('Replenish payload is required for preview');
+    }
+    const replenish = cmd.replenish;
+
+    const source = await this.warehouses.requireById(
+      replenish.sourceWarehouseId,
+      ctx.organizationId,
+    );
+
+    // Group sale items by FOH warehouse so we can simulate post-sales stock.
+    const fohIds = new Set<string>();
+    const consumedByWh = new Map<string, Map<string, Decimal>>();
+    for (const it of cmd.items) {
+      const wh = await this.warehouses.requireById(it.warehouseId, ctx.organizationId);
+      if (!wh.isFoh()) {
+        throw new DomainValidationError(
+          'Smjena se može zatvoriti samo nad FOH skladištima',
+          { warehouseId: wh.id, kind: wh.kind },
+        );
+      }
+      fohIds.add(wh.id);
+      const qty = new Decimal(it.quantity as string | number);
+      const inner = consumedByWh.get(wh.id) ?? new Map<string, Decimal>();
+      inner.set(it.articleId, (inner.get(it.articleId) ?? new Decimal(0)).plus(qty));
+      consumedByWh.set(wh.id, inner);
+    }
+
+    const skip = new Set(replenish.skipWarehouseIds ?? []);
+    const overridesByWh = new Map<string, Map<string, Decimal>>();
+    for (const ov of replenish.overrides ?? []) {
+      const inner = overridesByWh.get(ov.warehouseId) ?? new Map<string, Decimal>();
+      inner.set(ov.articleId, new Decimal(ov.targetQty as string | number));
+      overridesByWh.set(ov.warehouseId, inner);
+    }
+
+    // Snapshot source stock — used to compute availability across all FOHs.
+    const sourceStockEntries = await this.stock.getByWarehouse(source.id);
+    const sourceAvailable = new Map<string, Decimal>();
+    for (const entry of sourceStockEntries) {
+      sourceAvailable.set(entry.articleId, entry.quantity);
+    }
+
+    const warehouses: ReplenishWarehousePreview[] = [];
+    for (const fohId of fohIds) {
+      if (skip.has(fohId)) continue;
+      if (fohId === source.id) continue; // can't replenish from self
+
+      const targets = await this.stockTargets.list(fohId, ctx.organizationId);
+      const targetByArticle = new Map(targets.map((t) => [t.articleId, t.targetQty]));
+      const overridesForWh = overridesByWh.get(fohId) ?? new Map<string, Decimal>();
+
+      const stockEntries = await this.stock.getByWarehouse(fohId);
+      const currentByArticle = new Map(stockEntries.map((e) => [e.articleId, e.quantity]));
+
+      const consumed = consumedByWh.get(fohId) ?? new Map<string, Decimal>();
+
+      // Article ids of interest = union(targets, overrides) — only articles
+      // with a configured target (or explicit override) participate.
+      const articleIds = new Set<string>([
+        ...targetByArticle.keys(),
+        ...overridesForWh.keys(),
+      ]);
+
+      const items: ReplenishItemPreview[] = [];
+      for (const articleId of articleIds) {
+        const current = currentByArticle.get(articleId) ?? new Decimal(0);
+        const projected = current.minus(consumed.get(articleId) ?? new Decimal(0));
+        const override = overridesForWh.get(articleId);
+        const targetQty = override ?? targetByArticle.get(articleId);
+        if (!targetQty) {
+          items.push({
+            articleId,
+            currentStock: current.toFixed(3),
+            projectedStock: projected.toFixed(3),
+            targetQty: null,
+            delta: '0',
+            availableInSource: (sourceAvailable.get(articleId) ?? new Decimal(0)).toFixed(3),
+            willTransferQty: '0',
+            status: 'no_target',
+            overridden: !!override,
+          });
+          continue;
+        }
+        const rawDelta = targetQty.minus(projected);
+        const delta = rawDelta.isPositive() ? rawDelta : new Decimal(0);
+        const available = sourceAvailable.get(articleId) ?? new Decimal(0);
+        const willTransfer = Decimal.min(delta, available);
+
+        let status: ReplenishItemStatus = 'ok';
+        if (delta.isZero()) status = 'ok';
+        else if (available.isZero()) status = 'insufficient';
+        else if (willTransfer.lessThan(delta)) status = 'partial';
+
+        items.push({
+          articleId,
+          currentStock: current.toFixed(3),
+          projectedStock: projected.toFixed(3),
+          targetQty: targetQty.toFixed(3),
+          delta: delta.toFixed(3),
+          availableInSource: available.toFixed(3),
+          willTransferQty: willTransfer.toFixed(3),
+          status,
+          overridden: !!override,
+        });
+
+        // Subtract from running source availability so multiple FOHs don't
+        // double-count the same source stock.
+        if (willTransfer.isPositive()) {
+          sourceAvailable.set(articleId, available.minus(willTransfer));
+        }
+      }
+
+      warehouses.push({ warehouseId: fohId, items });
+    }
+
+    return { sourceWarehouseId: source.id, warehouses };
+  }
+
+  /**
+   * Runs the replenish portion inside an existing transaction (called by
+   * closeShift after sales/stock decrements have been written). Computes
+   * the same delta as `previewShiftReplenish`, then opens one StockTransfer
+   * per FOH using `TransfersService.create` with the shared tx.
+   *
+   * `fohWarehouseIds` is the set of warehouses that participated in the
+   * shift — replenish only touches those.
+   */
+  private async executeReplenish(
+    replenish: ReplenishCommand,
+    fohWarehouseIds: string[],
+    ctx: AuthContext,
+    tx: TxClient,
+  ): Promise<void> {
+    const source = await this.warehouses.requireById(
+      replenish.sourceWarehouseId,
+      ctx.organizationId,
+      tx,
+    );
+
+    const skip = new Set(replenish.skipWarehouseIds ?? []);
+    const overridesByWh = new Map<string, Map<string, Decimal>>();
+    for (const ov of replenish.overrides ?? []) {
+      const inner = overridesByWh.get(ov.warehouseId) ?? new Map<string, Decimal>();
+      inner.set(ov.articleId, new Decimal(ov.targetQty as string | number));
+      overridesByWh.set(ov.warehouseId, inner);
+    }
+
+    const sourceEntries = await this.stock.getByWarehouse(source.id, tx);
+    const sourceAvailable = new Map<string, Decimal>();
+    for (const e of sourceEntries) sourceAvailable.set(e.articleId, e.quantity);
+
+    for (const fohId of fohWarehouseIds) {
+      if (skip.has(fohId)) continue;
+      if (fohId === source.id) continue;
+
+      const targets = await this.stockTargets.list(fohId, ctx.organizationId, tx);
+      const targetByArticle = new Map(targets.map((t) => [t.articleId, t.targetQty]));
+      const overridesForWh = overridesByWh.get(fohId) ?? new Map<string, Decimal>();
+
+      const fohEntries = await this.stock.getByWarehouse(fohId, tx);
+      const currentByArticle = new Map(fohEntries.map((e) => [e.articleId, e.quantity]));
+
+      const articleIds = new Set<string>([
+        ...targetByArticle.keys(),
+        ...overridesForWh.keys(),
+      ]);
+
+      const transferItems: Array<{ articleId: string; quantity: Decimal }> = [];
+      for (const articleId of articleIds) {
+        const current = currentByArticle.get(articleId) ?? new Decimal(0);
+        const override = overridesForWh.get(articleId);
+        const targetQty = override ?? targetByArticle.get(articleId);
+        if (!targetQty) continue;
+        const rawDelta = targetQty.minus(current);
+        const delta = rawDelta.isPositive() ? rawDelta : new Decimal(0);
+        if (delta.isZero()) continue;
+        const available = sourceAvailable.get(articleId) ?? new Decimal(0);
+        const willTransfer = Decimal.min(delta, available);
+        if (willTransfer.isZero()) continue;
+        transferItems.push({ articleId, quantity: willTransfer });
+        sourceAvailable.set(articleId, available.minus(willTransfer));
+      }
+
+      if (transferItems.length === 0) continue;
+
+      await this.transfers.create(
+        {
+          sourceWarehouseId: source.id,
+          destinationWarehouseId: fohId,
+          note: 'Auto-replenish nakon zatvaranja smjene',
+          items: transferItems,
+        },
+        ctx,
+        tx,
+      );
+    }
   }
 
   async findShiftById(

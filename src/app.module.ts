@@ -19,7 +19,9 @@ import { ShoppingListsModule } from './presentation/shopping-lists/shopping-list
 import { StockModule } from './presentation/stock/stock.module';
 import { SuppliersModule } from './presentation/suppliers/suppliers.module';
 import { TransfersModule } from './presentation/transfers/transfers.module';
+import { UserWarehouseAccessModule } from './presentation/user-warehouse-access/user-warehouse-access.module';
 import { UsersModule } from './presentation/users/users.module';
+import { WarehouseStockTargetsModule } from './presentation/warehouse-stock-targets/warehouse-stock-targets.module';
 import { WarehousesModule } from './presentation/warehouses/warehouses.module';
 
 @Module({
@@ -46,6 +48,8 @@ import { WarehousesModule } from './presentation/warehouses/warehouses.module';
     PredictionsModule,
     ShoppingListsModule,
     NarrativesModule,
+    UserWarehouseAccessModule,
+    WarehouseStockTargetsModule,
   ],
 })
 export class AppModule {}
