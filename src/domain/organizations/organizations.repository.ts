@@ -10,6 +10,7 @@ export interface UpdateOrganizationInput {
   name?: string;
   currency?: string;
   isActive?: boolean;
+  priceTrackingEnabled?: boolean;
 }
 
 export interface ListOrganizationsOptions {

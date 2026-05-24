@@ -33,11 +33,16 @@ export class CreateArticleDto {
   @MaxLength(120)
   name!: string;
 
+  // Optional at the DTO level — the service enforces the requirement when
+  // `org.priceTrackingEnabled === true`. When the flag is off, missing prices
+  // are coerced to "0" so DB NOT NULL constraints still pass.
+  @IsOptional()
   @IsNumberString({}, { message: 'purchasePrice must be a numeric string' })
-  purchasePrice!: string;
+  purchasePrice?: string;
 
+  @IsOptional()
   @IsNumberString({}, { message: 'salePrice must be a numeric string' })
-  salePrice!: string;
+  salePrice?: string;
 
   @IsEnum(Unit)
   unit!: Unit;

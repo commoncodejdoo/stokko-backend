@@ -11,6 +11,7 @@ export class OrganizationsMapper {
       p.defaultLeadTimeDays,
       p.defaultSafetyDays,
       p.defaultCoverageDays,
+      p.priceTrackingEnabled,
       p.createdAt,
       p.updatedAt,
     );

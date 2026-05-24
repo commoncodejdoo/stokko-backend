@@ -28,6 +28,7 @@ export class UsersController {
         id: org.id,
         name: org.name,
         currency: org.currency,
+        priceTrackingEnabled: org.priceTrackingEnabled,
       },
     };
   }

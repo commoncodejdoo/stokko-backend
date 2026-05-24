@@ -11,6 +11,7 @@ import { RefreshTokenCodec } from '../../domain/auth/refresh-token-codec';
 import { RefreshTokensRepository } from '../../domain/auth/refresh-tokens.repository';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { JwtStrategy } from '../common/auth/jwt.strategy';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 
@@ -28,6 +29,7 @@ import { AuthController } from './auth.controller';
     }),
     UsersModule,
     AuditLogModule,
+    OrganizationsModule,
   ],
   controllers: [AuthController],
   providers: [

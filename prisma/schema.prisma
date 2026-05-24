@@ -104,6 +104,9 @@ enum AuditAction {
   USER_WAREHOUSE_ACCESS_GRANTED
   USER_WAREHOUSE_ACCESS_REVOKED
   WAREHOUSE_STOCK_TARGET_UPDATED
+
+  // Organization-wide settings
+  ORGANIZATION_SETTINGS_UPDATED
 }
 
 enum Urgency {
@@ -146,6 +149,8 @@ model Organization {
   defaultLeadTimeDays Int      @default(2)
   defaultSafetyDays   Int      @default(1)
   defaultCoverageDays Int      @default(7)
+  // Per-org feature flag — when false, price inputs are optional and prices/revenue are hidden across the UI.
+  priceTrackingEnabled Boolean @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

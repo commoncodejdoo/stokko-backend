@@ -18,8 +18,11 @@ class ProcurementItemDto {
   @IsNumberString({}, { message: 'quantity must be a numeric string' })
   quantity!: string;
 
+  // Optional at DTO level — the service enforces the requirement when the
+  // org's `priceTrackingEnabled` flag is on. Missing prices are stored as 0.
+  @IsOptional()
   @IsNumberString({}, { message: 'purchasePrice must be a numeric string' })
-  purchasePrice!: string;
+  purchasePrice?: string;
 }
 
 export class CreateProcurementDto {

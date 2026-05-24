@@ -17,4 +17,11 @@ export interface AuthContext {
    * can suppress audit-log entries while the admin operates as Owner.
    */
   impersonatedBy?: string;
+  /**
+   * Mirror of `Organization.priceTrackingEnabled`. Populated by `JwtStrategy`
+   * on every request so the `PriceTrackingFilterInterceptor` (and downstream
+   * filters) can decide whether to strip cost/revenue fields without
+   * re-querying the database.
+   */
+  priceTrackingEnabled?: boolean;
 }

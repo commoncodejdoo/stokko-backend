@@ -22,7 +22,10 @@ import { ArticlesController } from './articles.controller';
     forwardRef(() => WarehousesModule),
     StockModule,
     AuditLogModule,
-    UsersModule,
+    // UsersModule sits inside a cross-module cycle when JwtStrategy pulls
+    // in OrganizationsService (auth → users → user-warehouse-access →
+    // warehouses → articles → users). forwardRef breaks the JS-level cycle.
+    forwardRef(() => UsersModule),
   ],
   controllers: [ArticlesController],
   providers: [

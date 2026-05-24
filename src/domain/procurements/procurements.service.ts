@@ -25,8 +25,17 @@ import {
 export interface CreateProcurementItemCommand {
   articleId: string;
   quantity: string | number | Decimal;
-  /** Override of the article's default purchase price (per unit). */
-  purchasePrice: string | number | Decimal;
+  /**
+   * Override of the article's default purchase price (per unit).
+   * Optional when the org's `priceTrackingEnabled` flag is false; defaults to 0.
+   */
+  purchasePrice?: string | number | Decimal;
+}
+
+function isPriceMissing(v: string | number | Decimal | undefined): boolean {
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string' && v.trim() === '') return true;
+  return false;
 }
 
 export interface CreateProcurementCommand {
@@ -69,6 +78,16 @@ export class ProcurementsService {
     return this.prisma.$transaction(async (tx) => {
       const org = await this.orgs.requireById(ctx.organizationId, tx);
 
+      if (org.priceTrackingEnabled) {
+        for (const item of cmd.items) {
+          if (isPriceMissing(item.purchasePrice)) {
+            throw new DomainValidationError(
+              'Nabavna cijena po stavci je obavezna dok je praćenje cijena uključeno',
+            );
+          }
+        }
+      }
+
       // Validate FKs.
       const supplierId = cmd.supplierId ?? null;
       if (supplierId) {
@@ -89,7 +108,9 @@ export class ProcurementsService {
           items: cmd.items.map((i) => ({
             articleId: i.articleId,
             quantity: new Decimal(i.quantity as string | number),
-            purchasePrice: new Decimal(i.purchasePrice as string | number),
+            purchasePrice: isPriceMissing(i.purchasePrice)
+              ? new Decimal(0)
+              : new Decimal(i.purchasePrice as string | number),
           })),
         },
         org.currency,

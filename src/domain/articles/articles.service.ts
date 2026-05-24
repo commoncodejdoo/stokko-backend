@@ -28,8 +28,9 @@ import {
 export interface CreateArticleCommand {
   sku: string;
   name: string;
-  purchasePrice: string | number | Decimal;
-  salePrice: string | number | Decimal;
+  /** Optional when org.priceTrackingEnabled is false; defaults to 0 in that case. */
+  purchasePrice?: string | number | Decimal;
+  salePrice?: string | number | Decimal;
   unit: Unit;
   categoryId: string;
   supplierId?: string | null;
@@ -49,6 +50,12 @@ export interface UpdateArticleCommand {
   supplierId?: string | null;
   thresholdWarning?: string | number | Decimal;
   thresholdCritical?: string | number | Decimal;
+}
+
+function isPriceMissing(v: string | number | Decimal | undefined): boolean {
+  if (v === undefined || v === null) return true;
+  if (typeof v === 'string' && v.trim() === '') return true;
+  return false;
 }
 
 export interface ArticleWithStock {
@@ -105,6 +112,14 @@ export class ArticlesService {
   ): Promise<ArticleWithStock> {
     const org = await this.orgs.requireById(ctx.organizationId, tx);
 
+    if (org.priceTrackingEnabled) {
+      if (isPriceMissing(cmd.purchasePrice) || isPriceMissing(cmd.salePrice)) {
+        throw new DomainValidationError(
+          'Nabavna i prodajna cijena su obavezne dok je praćenje cijena uključeno',
+        );
+      }
+    }
+
     // Validate FKs.
     await this.categories.requireById(cmd.categoryId, ctx.organizationId, tx);
     if (cmd.supplierId) {
@@ -121,8 +136,12 @@ export class ArticlesService {
       organizationId: ctx.organizationId,
       sku: cmd.sku.trim(),
       name: cmd.name.trim(),
-      purchasePrice: new Decimal(cmd.purchasePrice as string | number),
-      salePrice: new Decimal(cmd.salePrice as string | number),
+      purchasePrice: isPriceMissing(cmd.purchasePrice)
+        ? new Decimal(0)
+        : new Decimal(cmd.purchasePrice as string | number),
+      salePrice: isPriceMissing(cmd.salePrice)
+        ? new Decimal(0)
+        : new Decimal(cmd.salePrice as string | number),
       unit: cmd.unit,
       categoryId: cmd.categoryId,
       supplierId: cmd.supplierId ?? null,
@@ -172,6 +191,21 @@ export class ArticlesService {
   ): Promise<Article> {
     const org = await this.orgs.requireById(ctx.organizationId, tx);
     const before = await this.requireById(id, ctx.organizationId, tx);
+
+    if (org.priceTrackingEnabled) {
+      // When the flag is on, callers may omit prices to leave them unchanged,
+      // but explicitly clearing them (empty string) is rejected.
+      if (cmd.purchasePrice !== undefined && isPriceMissing(cmd.purchasePrice)) {
+        throw new DomainValidationError(
+          'Nabavna cijena ne smije biti prazna dok je praćenje cijena uključeno',
+        );
+      }
+      if (cmd.salePrice !== undefined && isPriceMissing(cmd.salePrice)) {
+        throw new DomainValidationError(
+          'Prodajna cijena ne smije biti prazna dok je praćenje cijena uključeno',
+        );
+      }
+    }
 
     if (cmd.categoryId) {
       await this.categories.requireById(cmd.categoryId, ctx.organizationId, tx);

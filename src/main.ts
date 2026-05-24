@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './presentation/common/filters/global-exception.filter';
 import { EmployeePriceFilterInterceptor } from './presentation/common/interceptors/employee-price-filter.interceptor';
+import { PriceTrackingFilterInterceptor } from './presentation/common/interceptors/price-tracking-filter.interceptor';
 import { RequestContextInterceptor } from './presentation/common/interceptors/request-context.interceptor';
 import { TransformDecimalInterceptor } from './presentation/common/interceptors/transform-decimal.interceptor';
 
@@ -36,6 +37,7 @@ async function bootstrap(): Promise<void> {
   app.useGlobalInterceptors(
     new RequestContextInterceptor(),
     new TransformDecimalInterceptor(),
+    new PriceTrackingFilterInterceptor(),
     new EmployeePriceFilterInterceptor(),
   );
 

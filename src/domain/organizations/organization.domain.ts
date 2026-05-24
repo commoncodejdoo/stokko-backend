@@ -19,6 +19,8 @@ export class Organization {
     readonly defaultSafetyDays: number,
     /** Coverage target in days when computing suggestedQty. */
     readonly defaultCoverageDays: number,
+    /** When false, price inputs become optional and prices/revenue are hidden in the UI. */
+    readonly priceTrackingEnabled: boolean,
     readonly createdAt: Date,
     readonly updatedAt: Date,
   ) {
@@ -45,6 +47,7 @@ export class Organization {
       defaultLeadTimeDays: this.defaultLeadTimeDays,
       defaultSafetyDays: this.defaultSafetyDays,
       defaultCoverageDays: this.defaultCoverageDays,
+      priceTrackingEnabled: this.priceTrackingEnabled,
       createdAt: this.createdAt.toISOString(),
       updatedAt: this.updatedAt.toISOString(),
     };
