@@ -3,6 +3,7 @@ import { PrismaArticlesRepository } from '../../data/articles/articles.repositor
 import { ArticlesRepository } from '../../domain/articles/articles.repository';
 import { ArticlesService } from '../../domain/articles/articles.service';
 import { AuditLogModule } from '../audit-log/audit-log.module';
+import { BarcodeRegistryModule } from '../barcode-registry/barcode-registry.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { StockModule } from '../stock/stock.module';
@@ -16,6 +17,7 @@ import { ArticlesController } from './articles.controller';
     OrganizationsModule,
     CategoriesModule,
     SuppliersModule,
+    BarcodeRegistryModule,
     // WarehousesModule depends on ArticlesService for the
     // `GET /warehouses/:id/articles` enrichment endpoint, which creates a
     // cycle. forwardRef breaks it on both sides.

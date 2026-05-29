@@ -11,6 +11,7 @@ export class ArticlesMapper {
       p.organizationId,
       p.sku,
       p.name,
+      p.barcode,
       new Money(new Decimal(p.purchasePrice.toString()), currency),
       new Money(new Decimal(p.salePrice.toString()), currency),
       p.unit as Unit,

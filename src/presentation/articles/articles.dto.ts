@@ -7,11 +7,17 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Unit } from '../../domain/common/unit';
+
+// EAN/UPC/Code128 are alphanumeric + dashes; this loose pattern is just
+// defensive validation — the domain treats barcode as an opaque string.
+const BARCODE_REGEX = /^[0-9A-Za-z\-]+$/;
 
 class InitialStockDto {
   @IsString()
@@ -32,6 +38,12 @@ export class CreateArticleDto {
   @IsNotEmpty()
   @MaxLength(120)
   name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  @Matches(BARCODE_REGEX, { message: 'barcode must be alphanumeric (with optional dashes)' })
+  barcode?: string;
 
   // Optional at the DTO level — the service enforces the requirement when
   // `org.priceTrackingEnabled === true`. When the flag is off, missing prices
@@ -72,6 +84,13 @@ export class CreateArticleDto {
 export class UpdateArticleDto {
   @IsOptional() @IsString() @MaxLength(60) sku?: string;
   @IsOptional() @IsString() @MaxLength(120) name?: string;
+  // Explicit null clears the barcode; omitting the key leaves it unchanged.
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(32)
+  @Matches(BARCODE_REGEX, { message: 'barcode must be alphanumeric (with optional dashes)' })
+  barcode?: string | null;
   @IsOptional() @IsNumberString() purchasePrice?: string;
   @IsOptional() @IsNumberString() salePrice?: string;
   @IsOptional() @IsEnum(Unit) unit?: Unit;
@@ -85,6 +104,7 @@ export class ListArticlesQueryDto {
   @IsOptional() @IsString() q?: string;
   @IsOptional() @IsString() categoryId?: string;
   @IsOptional() @IsString() supplierId?: string;
+  @IsOptional() @IsString() @MaxLength(32) barcode?: string;
   /** "low" — only items with status WARNING or CRITICAL in any warehouse. */
   @IsOptional() @IsString() status?: 'low' | 'all';
   @IsOptional() @IsNumberString() page?: string;

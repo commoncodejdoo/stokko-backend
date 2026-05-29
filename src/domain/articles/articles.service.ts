@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
+import { PrismaService } from '../../data/common/prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { BarcodeRegistryService } from '../barcode-registry/barcode-registry.service';
 import { CategoriesService } from '../categories/categories.service';
+import { Category } from '../categories/category.domain';
 import { AuditAction } from '../common/audit-action';
 import { AuthContext } from '../common/auth-context';
 import {
@@ -28,6 +31,7 @@ import {
 export interface CreateArticleCommand {
   sku: string;
   name: string;
+  barcode?: string | null;
   /** Optional when org.priceTrackingEnabled is false; defaults to 0 in that case. */
   purchasePrice?: string | number | Decimal;
   salePrice?: string | number | Decimal;
@@ -43,6 +47,7 @@ export interface CreateArticleCommand {
 export interface UpdateArticleCommand {
   sku?: string;
   name?: string;
+  barcode?: string | null;
   purchasePrice?: string | number | Decimal;
   salePrice?: string | number | Decimal;
   unit?: Unit;
@@ -73,7 +78,40 @@ export class ArticlesService {
     private readonly warehouses: WarehousesService,
     private readonly stock: StockService,
     private readonly auditLog: AuditLogService,
+    private readonly prisma: PrismaService,
+    private readonly barcodeRegistry: BarcodeRegistryService,
   ) {}
+
+  private normalizeBarcode(raw: string | null | undefined): string | null {
+    if (raw === undefined || raw === null) return null;
+    const t = raw.trim();
+    return t.length ? t : null;
+  }
+
+  async findByBarcode(
+    organizationId: string,
+    barcode: string,
+    tx?: TxClient,
+  ): Promise<Article | null> {
+    const trimmed = barcode?.trim();
+    if (!trimmed) return null;
+    const org = await this.orgs.requireById(organizationId, tx);
+    return this.repo.findByBarcode(organizationId, trimmed, org.currency, tx);
+  }
+
+  /**
+   * Run `fn` inside an existing transaction if one was passed, otherwise
+   * open a new one. Keeps `create`/`update` atomic without breaking callers
+   * that already wrap multi-step work in their own transaction (e.g.
+   * bulk-import).
+   */
+  private async runInTx<T>(
+    tx: TxClient | undefined,
+    fn: (tx: TxClient) => Promise<T>,
+  ): Promise<T> {
+    if (tx) return fn(tx);
+    return this.prisma.$transaction(fn);
+  }
 
   async findById(id: string, organizationId: string, tx?: TxClient): Promise<Article | null> {
     const org = await this.orgs.requireById(organizationId, tx);
@@ -110,77 +148,106 @@ export class ArticlesService {
     ctx: AuthContext,
     tx?: TxClient,
   ): Promise<ArticleWithStock> {
-    const org = await this.orgs.requireById(ctx.organizationId, tx);
+    const barcode = this.normalizeBarcode(cmd.barcode);
 
-    if (org.priceTrackingEnabled) {
-      if (isPriceMissing(cmd.purchasePrice) || isPriceMissing(cmd.salePrice)) {
+    return this.runInTx(tx, async (t) => {
+      const org = await this.orgs.requireById(ctx.organizationId, t);
+
+      if (org.priceTrackingEnabled) {
+        if (isPriceMissing(cmd.purchasePrice) || isPriceMissing(cmd.salePrice)) {
+          throw new DomainValidationError(
+            'Nabavna i prodajna cijena su obavezne dok je praćenje cijena uključeno',
+          );
+        }
+      }
+
+      // Validate FKs.
+      const category = await this.categories.requireById(
+        cmd.categoryId,
+        ctx.organizationId,
+        t,
+      );
+      if (cmd.supplierId) {
+        await this.suppliers.requireById(cmd.supplierId, ctx.organizationId, t);
+      }
+
+      if (await this.repo.existsBySku(ctx.organizationId, cmd.sku, t)) {
+        throw new DomainValidationError(`SKU "${cmd.sku}" already exists in this organization`, {
+          sku: cmd.sku,
+        });
+      }
+
+      if (barcode && (await this.repo.existsByBarcode(ctx.organizationId, barcode, t))) {
         throw new DomainValidationError(
-          'Nabavna i prodajna cijena su obavezne dok je praćenje cijena uključeno',
+          `Barcode "${barcode}" already exists in this organization`,
+          { barcode },
         );
       }
-    }
 
-    // Validate FKs.
-    await this.categories.requireById(cmd.categoryId, ctx.organizationId, tx);
-    if (cmd.supplierId) {
-      await this.suppliers.requireById(cmd.supplierId, ctx.organizationId, tx);
-    }
-
-    if (await this.repo.existsBySku(ctx.organizationId, cmd.sku, tx)) {
-      throw new DomainValidationError(`SKU "${cmd.sku}" already exists in this organization`, {
-        sku: cmd.sku,
-      });
-    }
-
-    const input: CreateArticleInput = {
-      organizationId: ctx.organizationId,
-      sku: cmd.sku.trim(),
-      name: cmd.name.trim(),
-      purchasePrice: isPriceMissing(cmd.purchasePrice)
-        ? new Decimal(0)
-        : new Decimal(cmd.purchasePrice as string | number),
-      salePrice: isPriceMissing(cmd.salePrice)
-        ? new Decimal(0)
-        : new Decimal(cmd.salePrice as string | number),
-      unit: cmd.unit,
-      categoryId: cmd.categoryId,
-      supplierId: cmd.supplierId ?? null,
-      thresholdWarning: new Decimal(cmd.thresholdWarning as string | number),
-      thresholdCritical: new Decimal(cmd.thresholdCritical as string | number),
-      createdById: ctx.userId,
-    };
-
-    const created = await this.repo.create(input, org.currency, tx);
-
-    // Seed initial stock entries if provided.
-    const initialStock: StockEntry[] = [];
-    if (cmd.initialStock?.length) {
-      for (const seed of cmd.initialStock) {
-        await this.warehouses.requireById(seed.warehouseId, ctx.organizationId, tx);
-        const entry = await this.stock.setQuantity(
-          created.id,
-          seed.warehouseId,
-          new Decimal(seed.quantity as string | number),
-          tx,
-        );
-        initialStock.push(entry);
-      }
-    }
-
-    await this.auditLog.record(
-      {
+      const input: CreateArticleInput = {
         organizationId: ctx.organizationId,
-        userId: ctx.userId,
-        action: AuditAction.ARTICLE_CREATED,
-        entityType: 'Article',
-        entityId: created.id,
-        before: null,
-        after: created.toSnapshot(),
-      },
-      tx,
-    );
+        sku: cmd.sku.trim(),
+        name: cmd.name.trim(),
+        barcode,
+        purchasePrice: isPriceMissing(cmd.purchasePrice)
+          ? new Decimal(0)
+          : new Decimal(cmd.purchasePrice as string | number),
+        salePrice: isPriceMissing(cmd.salePrice)
+          ? new Decimal(0)
+          : new Decimal(cmd.salePrice as string | number),
+        unit: cmd.unit,
+        categoryId: cmd.categoryId,
+        supplierId: cmd.supplierId ?? null,
+        thresholdWarning: new Decimal(cmd.thresholdWarning as string | number),
+        thresholdCritical: new Decimal(cmd.thresholdCritical as string | number),
+        createdById: ctx.userId,
+      };
 
-    return { article: created, stock: initialStock };
+      const created = await this.repo.create(input, org.currency, t);
+
+      // Seed initial stock entries if provided.
+      const initialStock: StockEntry[] = [];
+      if (cmd.initialStock?.length) {
+        for (const seed of cmd.initialStock) {
+          await this.warehouses.requireById(seed.warehouseId, ctx.organizationId, t);
+          const entry = await this.stock.setQuantity(
+            created.id,
+            seed.warehouseId,
+            new Decimal(seed.quantity as string | number),
+            t,
+          );
+          initialStock.push(entry);
+        }
+      }
+
+      if (barcode) {
+        await this.barcodeRegistry.upsertOnArticleSave(
+          {
+            barcode,
+            suggestedName: created.name,
+            suggestedCategoryName: category.name,
+            suggestedUnit: created.unit,
+            orgId: ctx.organizationId,
+          },
+          t,
+        );
+      }
+
+      await this.auditLog.record(
+        {
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: AuditAction.ARTICLE_CREATED,
+          entityType: 'Article',
+          entityId: created.id,
+          before: null,
+          after: created.toSnapshot(),
+        },
+        t,
+      );
+
+      return { article: created, stock: initialStock };
+    });
   }
 
   async update(
@@ -189,92 +256,128 @@ export class ArticlesService {
     ctx: AuthContext,
     tx?: TxClient,
   ): Promise<Article> {
-    const org = await this.orgs.requireById(ctx.organizationId, tx);
-    const before = await this.requireById(id, ctx.organizationId, tx);
+    return this.runInTx(tx, async (t) => {
+      const org = await this.orgs.requireById(ctx.organizationId, t);
+      const before = await this.requireById(id, ctx.organizationId, t);
 
-    if (org.priceTrackingEnabled) {
-      // When the flag is on, callers may omit prices to leave them unchanged,
-      // but explicitly clearing them (empty string) is rejected.
-      if (cmd.purchasePrice !== undefined && isPriceMissing(cmd.purchasePrice)) {
-        throw new DomainValidationError(
-          'Nabavna cijena ne smije biti prazna dok je praćenje cijena uključeno',
+      if (org.priceTrackingEnabled) {
+        // When the flag is on, callers may omit prices to leave them unchanged,
+        // but explicitly clearing them (empty string) is rejected.
+        if (cmd.purchasePrice !== undefined && isPriceMissing(cmd.purchasePrice)) {
+          throw new DomainValidationError(
+            'Nabavna cijena ne smije biti prazna dok je praćenje cijena uključeno',
+          );
+        }
+        if (cmd.salePrice !== undefined && isPriceMissing(cmd.salePrice)) {
+          throw new DomainValidationError(
+            'Prodajna cijena ne smije biti prazna dok je praćenje cijena uključeno',
+          );
+        }
+      }
+
+      let category: Category | null = null;
+      if (cmd.categoryId) {
+        category = await this.categories.requireById(cmd.categoryId, ctx.organizationId, t);
+      }
+      if (cmd.supplierId) {
+        await this.suppliers.requireById(cmd.supplierId, ctx.organizationId, t);
+      }
+      if (cmd.sku && cmd.sku !== before.sku) {
+        if (await this.repo.existsBySku(ctx.organizationId, cmd.sku, t)) {
+          throw new DomainValidationError(`SKU "${cmd.sku}" already exists in this organization`, {
+            sku: cmd.sku,
+          });
+        }
+      }
+
+      // `barcode` is in the patch only if the caller actually sent the key.
+      // Distinguish "not in patch" (leave unchanged) from "null" (clear).
+      const barcodeChanging = cmd.barcode !== undefined;
+      const nextBarcode = barcodeChanging ? this.normalizeBarcode(cmd.barcode) : before.barcode;
+      if (barcodeChanging && nextBarcode && nextBarcode !== before.barcode) {
+        if (await this.repo.existsByBarcode(ctx.organizationId, nextBarcode, t)) {
+          throw new DomainValidationError(
+            `Barcode "${nextBarcode}" already exists in this organization`,
+            { barcode: nextBarcode },
+          );
+        }
+      }
+
+      const patch: UpdateArticleInput = {};
+      if (cmd.sku !== undefined) patch.sku = cmd.sku.trim();
+      if (cmd.name !== undefined) patch.name = cmd.name.trim();
+      if (barcodeChanging) patch.barcode = nextBarcode;
+      if (cmd.purchasePrice !== undefined) {
+        patch.purchasePrice = new Decimal(cmd.purchasePrice as string | number);
+      }
+      if (cmd.salePrice !== undefined) {
+        patch.salePrice = new Decimal(cmd.salePrice as string | number);
+      }
+      if (cmd.unit !== undefined) patch.unit = cmd.unit;
+      if (cmd.categoryId !== undefined) patch.categoryId = cmd.categoryId;
+      if (cmd.supplierId !== undefined) patch.supplierId = cmd.supplierId;
+      if (cmd.thresholdWarning !== undefined) {
+        patch.thresholdWarning = new Decimal(cmd.thresholdWarning as string | number);
+      }
+      if (cmd.thresholdCritical !== undefined) {
+        patch.thresholdCritical = new Decimal(cmd.thresholdCritical as string | number);
+      }
+
+      const updated = await this.repo.update(id, patch, org.currency, t);
+
+      // Domain re-validation: building a new Article re-runs invariants
+      // (e.g. thresholdCritical <= thresholdWarning, currencies match).
+      new Article(
+        updated.id,
+        updated.organizationId,
+        updated.sku,
+        updated.name,
+        updated.barcode,
+        updated.purchasePrice,
+        updated.salePrice,
+        updated.unit,
+        updated.categoryId,
+        updated.supplierId,
+        updated.thresholdWarning,
+        updated.thresholdCritical,
+        updated.createdById,
+        updated.deletedAt,
+        updated.createdAt,
+        updated.updatedAt,
+      );
+
+      // Touch the global catalogue whenever the article still carries a barcode.
+      // Idempotent — even an unrelated update (e.g. price tweak) refreshes
+      // lastSeenAt/usingOrgIds, which doubles as a low-cost activity ping.
+      if (updated.barcode) {
+        const effectiveCategory =
+          category ?? (await this.categories.requireById(updated.categoryId, ctx.organizationId, t));
+        await this.barcodeRegistry.upsertOnArticleSave(
+          {
+            barcode: updated.barcode,
+            suggestedName: updated.name,
+            suggestedCategoryName: effectiveCategory.name,
+            suggestedUnit: updated.unit,
+            orgId: ctx.organizationId,
+          },
+          t,
         );
       }
-      if (cmd.salePrice !== undefined && isPriceMissing(cmd.salePrice)) {
-        throw new DomainValidationError(
-          'Prodajna cijena ne smije biti prazna dok je praćenje cijena uključeno',
-        );
-      }
-    }
 
-    if (cmd.categoryId) {
-      await this.categories.requireById(cmd.categoryId, ctx.organizationId, tx);
-    }
-    if (cmd.supplierId) {
-      await this.suppliers.requireById(cmd.supplierId, ctx.organizationId, tx);
-    }
-    if (cmd.sku && cmd.sku !== before.sku) {
-      if (await this.repo.existsBySku(ctx.organizationId, cmd.sku, tx)) {
-        throw new DomainValidationError(`SKU "${cmd.sku}" already exists in this organization`, {
-          sku: cmd.sku,
-        });
-      }
-    }
-
-    const patch: UpdateArticleInput = {};
-    if (cmd.sku !== undefined) patch.sku = cmd.sku.trim();
-    if (cmd.name !== undefined) patch.name = cmd.name.trim();
-    if (cmd.purchasePrice !== undefined) {
-      patch.purchasePrice = new Decimal(cmd.purchasePrice as string | number);
-    }
-    if (cmd.salePrice !== undefined) {
-      patch.salePrice = new Decimal(cmd.salePrice as string | number);
-    }
-    if (cmd.unit !== undefined) patch.unit = cmd.unit;
-    if (cmd.categoryId !== undefined) patch.categoryId = cmd.categoryId;
-    if (cmd.supplierId !== undefined) patch.supplierId = cmd.supplierId;
-    if (cmd.thresholdWarning !== undefined) {
-      patch.thresholdWarning = new Decimal(cmd.thresholdWarning as string | number);
-    }
-    if (cmd.thresholdCritical !== undefined) {
-      patch.thresholdCritical = new Decimal(cmd.thresholdCritical as string | number);
-    }
-
-    const updated = await this.repo.update(id, patch, org.currency, tx);
-
-    // Domain re-validation: building a new Article re-runs invariants
-    // (e.g. thresholdCritical <= thresholdWarning, currencies match).
-    new Article(
-      updated.id,
-      updated.organizationId,
-      updated.sku,
-      updated.name,
-      updated.purchasePrice,
-      updated.salePrice,
-      updated.unit,
-      updated.categoryId,
-      updated.supplierId,
-      updated.thresholdWarning,
-      updated.thresholdCritical,
-      updated.createdById,
-      updated.deletedAt,
-      updated.createdAt,
-      updated.updatedAt,
-    );
-
-    await this.auditLog.record(
-      {
-        organizationId: ctx.organizationId,
-        userId: ctx.userId,
-        action: AuditAction.ARTICLE_UPDATED,
-        entityType: 'Article',
-        entityId: updated.id,
-        before: before.toSnapshot(),
-        after: updated.toSnapshot(),
-      },
-      tx,
-    );
-    return updated;
+      await this.auditLog.record(
+        {
+          organizationId: ctx.organizationId,
+          userId: ctx.userId,
+          action: AuditAction.ARTICLE_UPDATED,
+          entityType: 'Article',
+          entityId: updated.id,
+          before: before.toSnapshot(),
+          after: updated.toSnapshot(),
+        },
+        t,
+      );
+      return updated;
+    });
   }
 
   async softDelete(id: string, ctx: AuthContext, tx?: TxClient): Promise<void> {

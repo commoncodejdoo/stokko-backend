@@ -42,6 +42,7 @@ export class ArticlesController {
       search: q.q,
       categoryId: q.categoryId,
       supplierId: q.supplierId,
+      barcode: q.barcode,
     });
 
     // Attach stock for each article.
@@ -170,6 +171,7 @@ export class ArticlesController {
       id: a.id,
       sku: a.sku,
       name: a.name,
+      barcode: a.barcode,
       unit: a.unit,
       categoryId: a.categoryId,
       supplierId: a.supplierId,

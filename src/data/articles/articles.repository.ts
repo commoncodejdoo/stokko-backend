@@ -35,6 +35,7 @@ export class PrismaArticlesRepository extends ArticlesRepository {
         organizationId: input.organizationId,
         sku: input.sku,
         name: input.name,
+        barcode: input.barcode ?? null,
         purchasePrice: this.toPrismaDecimal(input.purchasePrice),
         salePrice: this.toPrismaDecimal(input.salePrice),
         unit: input.unit,
@@ -64,6 +65,7 @@ export class PrismaArticlesRepository extends ArticlesRepository {
     };
     if (filter.categoryId) where.categoryId = filter.categoryId;
     if (filter.supplierId) where.supplierId = filter.supplierId;
+    if (filter.barcode) where.barcode = filter.barcode;
     if (filter.search) {
       const q = filter.search.trim();
       where.OR = [
@@ -88,6 +90,7 @@ export class PrismaArticlesRepository extends ArticlesRepository {
     const data: Prisma.ArticleUpdateInput = {};
     if (patch.sku !== undefined) data.sku = patch.sku;
     if (patch.name !== undefined) data.name = patch.name;
+    if (patch.barcode !== undefined) data.barcode = patch.barcode;
     if (patch.purchasePrice !== undefined) data.purchasePrice = this.toPrismaDecimal(patch.purchasePrice);
     if (patch.salePrice !== undefined) data.salePrice = this.toPrismaDecimal(patch.salePrice);
     if (patch.unit !== undefined) data.unit = patch.unit;
@@ -123,5 +126,29 @@ export class PrismaArticlesRepository extends ArticlesRepository {
       where: { organizationId_sku: { organizationId, sku } },
     });
     return !!row;
+  }
+
+  async existsByBarcode(
+    organizationId: string,
+    barcode: string,
+    tx?: TxClient,
+  ): Promise<boolean> {
+    const row = await this.client(tx).article.findFirst({
+      where: { organizationId, barcode, deletedAt: null },
+      select: { id: true },
+    });
+    return !!row;
+  }
+
+  async findByBarcode(
+    organizationId: string,
+    barcode: string,
+    currency: string,
+    tx?: TxClient,
+  ): Promise<Article | null> {
+    const row = await this.client(tx).article.findFirst({
+      where: { organizationId, barcode, deletedAt: null },
+    });
+    return row ? this.mapper.toDomain(row, currency) : null;
   }
 }

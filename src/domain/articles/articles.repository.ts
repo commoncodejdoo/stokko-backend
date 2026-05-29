@@ -7,6 +7,7 @@ export interface CreateArticleInput {
   organizationId: string;
   sku: string;
   name: string;
+  barcode?: string | null;
   purchasePrice: Decimal;
   salePrice: Decimal;
   unit: Unit;
@@ -20,6 +21,7 @@ export interface CreateArticleInput {
 export interface UpdateArticleInput {
   sku?: string;
   name?: string;
+  barcode?: string | null;
   purchasePrice?: Decimal;
   salePrice?: Decimal;
   unit?: Unit;
@@ -34,6 +36,7 @@ export interface ListArticlesFilter {
   search?: string;
   categoryId?: string;
   supplierId?: string;
+  barcode?: string;
 }
 
 export abstract class ArticlesRepository {
@@ -66,4 +69,17 @@ export abstract class ArticlesRepository {
     sku: string,
     tx?: TxClient,
   ): Promise<boolean>;
+
+  abstract existsByBarcode(
+    organizationId: string,
+    barcode: string,
+    tx?: TxClient,
+  ): Promise<boolean>;
+
+  abstract findByBarcode(
+    organizationId: string,
+    barcode: string,
+    currency: string,
+    tx?: TxClient,
+  ): Promise<Article | null>;
 }

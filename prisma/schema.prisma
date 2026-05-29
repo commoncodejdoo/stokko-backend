@@ -169,6 +169,7 @@ model Organization {
   predictionSnapshots PredictionSnapshot[]
   shoppingLists       ShoppingList[]
   narratives          RecommendationNarrative[]
+  barcodeRegistries   BarcodeRegistry[]
 }
 
 model User {
@@ -293,6 +294,11 @@ model Article {
   organizationId    String
   sku               String
   name              String
+  // Optional product barcode (EAN/UPC/Code128). Unique within an org, but
+  // multiple orgs may legitimately hold the same barcode for the same product.
+  // Linked to the global BarcodeRegistry catalogue via the `barcode` value
+  // (not a FK — registry is upserted out of band by ArticlesService).
+  barcode           String?
   purchasePrice     Decimal   @db.Decimal(12, 2)
   salePrice         Decimal   @db.Decimal(12, 2)
   unit              Unit
@@ -321,8 +327,10 @@ model Article {
 
   @@unique([organizationId, sku])
   @@unique([organizationId, name])
+  @@unique([organizationId, barcode])
   @@index([organizationId, categoryId, deletedAt])
   @@index([organizationId, supplierId])
+  @@index([organizationId, barcode])
 }
 
 model StockEntry {
@@ -336,6 +344,31 @@ model StockEntry {
 
   @@id([articleId, warehouseId])
   @@index([warehouseId])
+}
+
+// ───────────── GLOBAL CATALOG (cross-tenant) ─────────────
+
+// Shared barcode catalogue across all tenants. When any org creates or
+// updates an Article with a barcode, ArticlesService upserts this row:
+// firstSeenOrgId / firstSeenAt freeze on first insert; usingOrgIds grows
+// (Set semantics — no dupes). Used to pre-fill new-article forms when a
+// scanned barcode is unknown to the current org but known to the platform.
+// usingOrgIds / firstSeenOrgId are NEVER exposed via the public API — only
+// the suggested* fields go to the client.
+model BarcodeRegistry {
+  barcode               String   @id
+  suggestedName         String
+  suggestedBrand        String?
+  suggestedCategoryName String?
+  suggestedUnit         Unit
+  firstSeenOrgId        String
+  firstSeenAt           DateTime @default(now())
+  lastSeenAt            DateTime @updatedAt
+  usingOrgIds           String[] @default([])
+
+  firstSeenOrg Organization @relation(fields: [firstSeenOrgId], references: [id])
+
+  @@index([firstSeenOrgId])
 }
 
 // ───────────── STOCK MOVEMENTS ─────────────
